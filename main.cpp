@@ -1,7 +1,8 @@
 #include <iostream>
 #include <stdint.h>
 #include <assert.h>
-#include "sim.h"
+#include "sim.hpp"
+#include "vm.hpp"
 
 using namespace std;
 

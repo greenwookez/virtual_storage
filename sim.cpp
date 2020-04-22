@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <stdint.h>
 #include <assert.h>
-#include "sim.h"
+#include "sim.hpp"
 
 
 ////// Agent //////////////////////////////////////////////////////////////////////////
