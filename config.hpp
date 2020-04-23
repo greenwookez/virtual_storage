@@ -1,0 +1,2 @@
+const int TIME_FOR_CALLCPU = 100;
+const int TIME_FOR_MEMORYREQUEST = 200;

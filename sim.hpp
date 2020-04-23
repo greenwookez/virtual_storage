@@ -2,6 +2,10 @@
 // Virtual Storage Simulator
 //
 
+#include <stdint.h> //bb
+#include <assert.h> //bb
+#include <string> //bb
+
 typedef uint64_t SimulatorTime;
 
 class Sim;
