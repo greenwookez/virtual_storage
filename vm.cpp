@@ -2,9 +2,16 @@
 
 #include <cstdint>
 #include <ctime>
+#include <unistd.h>
 
 extern OS *g_pOS;
 extern CPU *g_pCPU;
+extern Computer *g_pConfig;
+
+int randomizer(int max) { // Функция, возвращающая любое число от 0 до max.
+    srand(unsigned(clock()));
+    return rand()%max;
+};
 
 /* class Computer */
     Computer :: Computer() {
@@ -18,9 +25,12 @@ extern CPU *g_pCPU;
 /* class CPU */
     void CPU :: Convert(PageNumber address) {
         Log("I have to convert virtual address(" + to_string(address) + ")");
-        srand(unsigned(time(0)));
-        int chance = rand()%100;
+
+        // Действует следующее предположение: шанс отсутствия страницы - 50%.
+        // Это временная мера.
+        int chance = randomizer(100);
         Log("Шанс при конвертации: " + to_string(chance));
+
         if (chance < 50) {
             Schedule(GetTime()+TIME_FOR_CONVERSION, g_pOS, &OS::HandleInterruption);
         } else {
@@ -39,10 +49,14 @@ extern CPU *g_pCPU;
 
 /* class OS */
     void OS :: CallCPU(int WriteFlag) {
-        PageNumber address = rand() % 150; // ОС выделяет виртуальный адрес процессу, так как она выполняет функции виртуальной памяти. Пока он рандомный....
+        PageNumber address = rand() % g_pConfig->GetRealMemorySize(); // ОС выделяет виртуальный адрес процессу, так как она выполняет функции виртуальной памяти. Пока он рандомный....
         
-        Log("Calling CPU...");
+        Log("Calling CPU with WriteFlag = " + to_string(WriteFlag));
         Schedule(GetTime()+TIME_FOR_CALLCPU, g_pCPU, &CPU::Convert, address);
+    };
+
+    void OS :: HandleInterruption() {
+        Log("Получено прерывание.");
     };
 
     void OS :: Wait() {
@@ -51,17 +65,15 @@ extern CPU *g_pCPU;
 
     void OS :: Start() {
         Schedule(GetTime(), this, &OS::Wait);
-    };
-
-    void OS :: HandleInterruption() {
-        Log("Получено прерывание.");
-    };
+    };    
 /* end of class OS */
 
 /* class Process */
     void Process :: MemoryRequest(int WriteFlag) {
-        Log("I am requesting memory with WriteFlag = " + to_string(WriteFlag) + ".");
-        Schedule(GetTime()+TIME_FOR_MEMORYREQUEST, g_pOS, &OS::CallCPU, WriteFlag);
+        // Действует следующее предположение: 80% обращений происходят по чтению, 20% - по записи.
+        // Это временная мера.
+        bool write_flag = randomizer(100) > 80;
+        Schedule(GetTime()+TIME_FOR_MEMORYREQUEST, g_pOS, &OS::CallCPU, write_flag);
     };
 
     Process :: Process() {

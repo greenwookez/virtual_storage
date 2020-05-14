@@ -9,10 +9,13 @@ using namespace std;
 Sim *g_pSim;
 OS *g_pOS;
 CPU *g_pCPU;
+Computer *g_pConfig;
 
 int main()
 {
     g_pSim = new Sim;
+
+    g_pConfig = new Computer;
     
     g_pOS = new OS;
     g_pOS->SetName("OS");
@@ -30,7 +33,10 @@ int main()
     pProcess02->Start();
     Schedule(500, pProcess01, &Process::Wait);
     Schedule(1000,pProcess01, &Process::MemoryRequest, 1);
-    
+    Schedule(1100,pProcess01, &Process::MemoryRequest, 1);
+    Schedule(1100,pProcess02, &Process::MemoryRequest, 0);
+    Schedule(1200,pProcess01, &Process::MemoryRequest, 1);
+    Schedule(1300,pProcess01, &Process::MemoryRequest, 1);
 
 
     g_pSim->SetLimit(30000);
