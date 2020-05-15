@@ -32,11 +32,15 @@ int main()
     pProcess01->Start();
     pProcess02->Start();
     Schedule(500, pProcess01, &Process::Wait);
-    Schedule(1000,pProcess01, &Process::MemoryRequest, 1);
-    Schedule(1100,pProcess01, &Process::MemoryRequest, 1);
-    Schedule(1100,pProcess02, &Process::MemoryRequest, 0);
-    Schedule(1200,pProcess01, &Process::MemoryRequest, 1);
-    Schedule(1300,pProcess01, &Process::MemoryRequest, 1);
+    Schedule(1000,pProcess01, &Process::MemoryRequest);
+    Schedule(1100,pProcess01, &Process::MemoryRequest);
+    Schedule(1100,pProcess02, &Process::MemoryRequest);
+    Schedule(1100,pProcess02, &Process::MemoryRequest);
+    Schedule(1100,pProcess02, &Process::MemoryRequest);
+    Schedule(1100,pProcess01, &Process::MemoryRequest);
+    Schedule(1100,pProcess02, &Process::MemoryRequest);
+    Schedule(1200,pProcess01, &Process::MemoryRequest);
+    Schedule(1300,pProcess01, &Process::MemoryRequest);
 
 
     g_pSim->SetLimit(30000);

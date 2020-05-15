@@ -29,8 +29,8 @@ std::string Agent::GetName()
 void Agent::Log(std::string text)
 {
     PrintTime(&std::cout);
-    std::cout << " " << std::setw(10) << std::setfill(' ') << std::left << GetName()
-        << " " << text << std::endl;
+    std::cout << " " << std::setw(10) << std::setfill(' ') << std::right << GetName()
+        << "   " << text << std::endl;
 }
 
 ////// EventQueue //////////////////////////////////////////////////////////////////////////
