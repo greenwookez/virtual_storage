@@ -36,11 +36,7 @@ class Computer {
 class CPU : public Agent {
     /*
         Класс, который моделирует работу процессора.
-        В нём также хранится таблица переадресации.
     */
-    
-    TranslationRecord translation_table[DEFAULT_TRANSLATION_TABLE_SIZE];
-
     public:
 
     void Convert(PageNumber address); // Метод, решающий задачу преобразования виртуального адреса
@@ -51,10 +47,11 @@ class CPU : public Agent {
 
 class OS : public Agent {
     /*
-        Класс, который моделирует работу ОС.
-        В том числе, он полностью занимается контроллированием
-        работы виртуальной памяти.
+        Класс, который моделирует работу ОС, а также решает задачи
+        управления ВП, в том числе обеспечивает ТП.
      */
+    
+    TranslationRecord translation_table[DEFAULT_TRANSLATION_TABLE_SIZE];
 
     public:
     void CallCPU(bool WriteFlag); // Вызов процессора для решения задачи преобразования виртуального адреса
@@ -99,5 +96,6 @@ class Process : public Agent {
 class MyProcess : public Process {
     public:
     void MemoryRequest(bool WriteFlag);
+    void Work();
 };
 

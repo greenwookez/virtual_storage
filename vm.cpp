@@ -13,6 +13,8 @@ int randomizer(int max) { // Функция, возвращающая любое
     return rand()%max;
 };
 
+
+
 /* class Computer */
     Computer :: Computer() {
         // Задание параметров памяти по умолчанию
@@ -112,7 +114,35 @@ int randomizer(int max) { // Функция, возвращающая любое
             (по чтению или по записи) определяется пользователем симулятора
             через формальный параметр WriteFlag.
         */
-       Schedule(GetTime()+TIME_FOR_MEMORYREQUEST, g_pOS, &OS::CallCPU, WriteFlag);
+        Schedule(GetTime()+TIME_FOR_MEMORYREQUEST, g_pOS, &OS::CallCPU, WriteFlag);
+    };
+
+    void MyProcess :: Work() {
+        /*
+            В этом методе моделируется задача обращения матрицы большой размерности.
+            Алгоритм взят из источника: http://www.algolib.narod.ru/Math/ObrMatrix.html
+        */
+        
+        const int const_a = 10;//DEFAULT_MATRIX_SIZE_FOR_MYPROCESS;
+        float input[const_a][const_a];
+        float output[const_a][const_a];
+        int i,j,k;
+        for (k = 0; k <= const_a-1; k++) {
+            for (i = 0; i <= const_a-1; i++) {
+                for (j = 0; j <= const_a-1; j++) {
+                    if (i == k && j == k) {
+                        output[i][j] = 1 / input[i][j];
+                    } else if (i == k && j != k) {
+                        output[i][j] = -input[i][j]/input[k][k];
+                    } else if (i != k && j == k) {
+                        output[i][j] = input[i][k]/input[k][k];
+                    } else if (i != k && j != k) {
+                        output[i][j] = input[i][j] - input[k][j] * input[i][k]/input[k][k];
+                    }
+                    Process :: MemoryRequest();
+                }
+            }
+        }
     };
 /* end of class MyProcess */
 

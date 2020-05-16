@@ -14,3 +14,6 @@ const uint64_t DEFAULT_MEMORY_USAGE = 4; // Память, занимаемая �
 const SimulatorTime TIME_FOR_CALLCPU = 100;
 const SimulatorTime TIME_FOR_MEMORYREQUEST = 200;
 const SimulatorTime TIME_FOR_CONVERSION = 300;
+
+/* ДРУГОЕ */
+const int DEFAULT_MATRIX_SIZE_FOR_MYPROCESS = 100; // Размер квадратной матрицы в методе Work класса MyProcess

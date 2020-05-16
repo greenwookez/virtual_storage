@@ -23,10 +23,10 @@ int main()
     g_pCPU = new CPU;
     g_pCPU->SetName("CPU");
     
-    Process *pProcess01 = new Process;
+    MyProcess *pProcess01 = new MyProcess;
     pProcess01->SetName("Process1");
 
-    Process *pProcess02 = new Process;
+    MyProcess *pProcess02 = new MyProcess;
     pProcess02->SetName("Process2");
 
     pProcess01->Start();
@@ -34,7 +34,7 @@ int main()
     Schedule(500, pProcess01, &Process::Wait);
     Schedule(1000,pProcess01, &Process::MemoryRequest);
     Schedule(1100,pProcess01, &Process::MemoryRequest);
-    Schedule(1100,pProcess02, &Process::MemoryRequest);
+    Schedule(1100,pProcess02, &MyProcess::Work);
     Schedule(1100,pProcess02, &Process::MemoryRequest);
     Schedule(1100,pProcess02, &Process::MemoryRequest);
     Schedule(1100,pProcess01, &Process::MemoryRequest);
@@ -61,6 +61,7 @@ int main()
     }
 
     delete pProcess01;
+    delete pProcess02;
     delete g_pSim;
 
     return 0;
