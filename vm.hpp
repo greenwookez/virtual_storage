@@ -6,9 +6,9 @@ using namespace std;
 struct TranslationRecord { // Запись в таблице переадресации
     uint64_t virtual_address; // Адрес из ВАП
     uint64_t real_address; // Адрес из РАП (при наличии)
-    uint64_t archive_address; //Адрес из ААП (при наличии)
     uint64_t attribute; // Атрибут записи (при наличии)
 };
+class Process; // Заголовок класса Process (для класса OS)
 
 class Computer {
     /*
@@ -49,15 +49,22 @@ class OS : public Agent {
     /*
         Класс, который моделирует работу ОС, а также решает задачи
         управления ВП, в том числе обеспечивает ТП.
-     */
-    
-    TranslationRecord translation_table[DEFAULT_TRANSLATION_TABLE_SIZE];
+    */
 
+    TranslationRecord *translation_table[MAX_PROCESS_NUM]; // массив ТП
+    int current_translation_table_index; // текущий свободный слева индекс в массиве ТП.
+    // Например, если существуют две ТП, то этот индекс будет равен 2, так как 0,1 индексы уже заняты.
+    
     public:
     void CallCPU(bool WriteFlag); // Вызов процессора для решения задачи преобразования виртуального адреса
     void HandleInterruption(); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
+    void IntitializeProcess(Process * _process); // Моделируется загрузка процесса в память
+    
     void Wait();
     void Start();
+
+    OS();
+    ~OS(); // Деструктор для освобождения динамически выделенной памяти
 };
 
 extern OS *g_pOS;
@@ -66,7 +73,7 @@ extern CPU *g_pCPU;
 class AE : public Agent {
     /*
         Класс, который моделирует работу архивной среды.
-     */
+    */
 
     public:
     void Wait();
@@ -78,24 +85,27 @@ class Process : public Agent {
         Класс - базовая модель процесса.
         Остальные модели будут являться наследниками этого класс
      */ 
-    
-    uint64_t memory_usage; // количество страниц в памяти, необходимое для размещения этого процесса
+    int translation_table_index; // идентификатор процесса (для связки с ТП)
+    uint64_t memory_usage; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
 
     public:
-    virtual void MemoryRequest(); // запрос памяти
 
+    void SetTranslationTableIndex(int value) { translation_table_index = value; }
     void SetMemoryUsage(uint64_t value) { memory_usage = value; };
     uint64_t GetMemoryUsage() { return memory_usage; };
-
-    void Work();
-    void Wait();
-    void Start();
+    
     Process(); // конструктор по-умолчанию
+    void MemoryRequest(bool WriteFlag); // запрос памяти
+    void Start(); // Стартует процесс загрузки себя в память (равносильно запуску исполняемого файла)
+    
+    virtual void Work();
+    void Wait();
+    
+    
 };
 
 class MyProcess : public Process {
     public:
-    void MemoryRequest(bool WriteFlag);
     void Work();
 };
 
