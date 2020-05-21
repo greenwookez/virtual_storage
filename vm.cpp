@@ -6,7 +6,30 @@
 
 extern OS *g_pOS;
 extern CPU *g_pCPU;
-extern Computer *g_pConfig;
+extern Computer *g_pComputer;
+
+/* class MemoryAddressSpace */
+    PageNumber MemoryAddressSpace :: Allocate(){
+        for (int i = 0; i < DEFAULT_TRANSLATION_TABLE_SIZE; i++) {
+            if (memory[i].is_allocated == false) {
+                memory[i].is_allocated = true;
+                // может быть ещё какие-то данные нужно будеть здесь установить
+
+                return i;
+            };
+        };
+
+        //TODO: случай, когда нераспределённой памяти нет
+    };
+
+/* end of class MemoryAddressSpace */
+
+/* class TranslationTable */
+    void TranslationTable :: AddRecord(TranslationRecord input) {
+        records[free_record] = input;
+        free_record++;
+    };
+/* end of class TranslationTable */
 
 int randomizer(int max) { // Функция, возвращающая любое число от 0 до max.
     srand(unsigned(clock()));
@@ -51,7 +74,7 @@ int randomizer(int max) { // Функция, возвращающая любое
             виртуальной памяти. Пока он рандомный...
             TODO: Полностью переработать
         */
-        PageNumber address = rand() % g_pConfig->GetRealMemorySize(); 
+        PageNumber address = rand() % g_pComputer->GetRealMemorySize(); 
         
         //Log("Calling CPU with WriteFlag = " + to_string(WriteFlag));
         Schedule(GetTime()+TIME_FOR_CALLCPU, g_pCPU, &CPU::Convert, address);
@@ -66,12 +89,15 @@ int randomizer(int max) { // Функция, возвращающая любое
         /*
             В этом методе моделируются действия по загрузке кода процесса в память.
         */
+
         // Создаём новую ТП для этого процесса
-        translation_table[current_translation_table_index] = new TranslationRecord[DEFAULT_TRANSLATION_TABLE_SIZE];
+        translation_tables[current_translation_table_index] = new TranslationTable;
         _process->SetTranslationTableIndex(current_translation_table_index);
         current_translation_table_index++;
         
-        //TODO: Расположить в памяти процесс
+        // Пока предположим, что каждый процесс занимает одну страницу в памяти
+        TranslationRecord tmp = { 0, g_pComputer->GetAddressSpace().Allocate(),0 }; // по виртуальному адресу 0 будет храниться
+        translation_tables[current_translation_table_index]->AddRecord(tmp);
 
 
         Schedule(GetTime()+TIME_FOR_PROCESS_INITIALIZATION, _process, &Process::Work);
@@ -86,17 +112,13 @@ int randomizer(int max) { // Функция, возвращающая любое
         Schedule(GetTime(), this, &OS::Wait);
     };
 
-    OS :: OS() {
-        current_translation_table_index = 0;
-    };
-
     OS :: ~OS() {
         /*
             Деструктор, освобождающий динамически выделенную память.
         */
         int i;
-        for (i = 0; i <= MAX_PROCESS_NUM; i++) {
-            delete[] translation_table[i];
+        for (i = 0; i < current_translation_table_index; i++) {
+            delete translation_tables[i];
         };
     };
 /* end of class OS */
@@ -126,10 +148,6 @@ int randomizer(int max) { // Функция, возвращающая любое
     void Process :: Wait() {
         Log("I am waiting.");
         //TODO: Добавить реализацию.
-    };
-
-    Process :: Process() {
-        memory_usage = DEFAULT_MEMORY_USAGE;
     };
 /* end of class Process */
 
@@ -162,12 +180,3 @@ int randomizer(int max) { // Функция, возвращающая любое
         }
     };
 /* end of class MyProcess */
-
-/* class Computer */
-    Computer :: Computer() {
-        // Задание параметров памяти по умолчанию
-        rm_size = DEFAULT_REAL_MEMORY_SIZE;
-        ae_size = DEFAULT_ARCHIVE_ENVIROMENT_SIZE;
-        page_size = DEFAULT_PAGE_SIZE;
-    };
-/* end of class Computer */

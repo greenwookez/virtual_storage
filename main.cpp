@@ -9,13 +9,13 @@ using namespace std;
 Sim *g_pSim;
 OS *g_pOS;
 CPU *g_pCPU;
-Computer *g_pConfig;
+Computer *g_pComputer;
 
 int main()
 {
     g_pSim = new Sim;
 
-    g_pConfig = new Computer;
+    g_pComputer = new Computer;
     
     g_pOS = new OS;
     g_pOS->SetName("OS");
@@ -52,6 +52,9 @@ int main()
     delete pProcess01;
     delete pProcess02;
     delete g_pSim;
+    delete g_pComputer;
+    delete g_pOS;
+    delete g_pCPU;
 
     return 0;
 }

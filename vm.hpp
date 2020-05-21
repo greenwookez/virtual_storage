@@ -3,11 +3,39 @@
 
 using namespace std;
 
+
 struct TranslationRecord { // Запись в таблице переадресации
     uint64_t virtual_address; // Адрес из ВАП
     uint64_t real_address; // Адрес из РАП (при наличии)
     uint64_t attribute; // Атрибут записи (при наличии)
 };
+
+class TranslationTable {
+    TranslationRecord records[DEFAULT_TRANSLATION_TABLE_SIZE]; // массив записей
+    int index; // индекс ТП
+    int free_record = 0; // индекс текущей первой свободной записи в массиве records
+
+    public:
+    void SetIndex(int value) { index = value; };
+    int GetIndex() { return index; };
+
+    void AddRecord(TranslationRecord input);
+};
+struct MemoryRecord {
+    bool is_allocated = 0; // флаг распределения, по умолчанию все страницы НЕ распределены
+    // здесь можно добавить какие-либо ещё данные
+};
+
+class MemoryAddressSpace { // РАП
+    MemoryRecord memory[DEFAULT_REAL_MEMORY_SIZE];
+
+    public:
+    void SetPageByAddress(MemoryRecord input, PageNumber address) { memory[address] = input; };
+    MemoryRecord GetPageByAddress(PageNumber address) { return memory[address]; };
+
+    PageNumber Allocate();
+};
+
 class Process; // Заголовок класса Process (для класса OS)
 
 class Computer {
@@ -17,20 +45,21 @@ class Computer {
         и накладные расходы на страничный обмен.
     */
 
-    uint64_t rm_size; // размер реальной памяти
-    uint64_t ae_size; // размер архивной среды
-    uint64_t page_size; // размер страницы
+    uint64_t rm_size = DEFAULT_REAL_MEMORY_SIZE; // размер реальной памяти
+    uint64_t ae_size = DEFAULT_ARCHIVE_ENVIROMENT_SIZE; // размер архивной среды
+    uint64_t page_size = DEFAULT_PAGE_SIZE; // размер страницы в байтах в виде степени двойки
     
+    MemoryAddressSpace rm; // РАП
+
     public:
     void SetRealMemorySize(uint64_t value) { rm_size = value; };
     void SetArchiveEnviromentSize(uint64_t value) { ae_size = value; };
     void SetPageSize(uint64_t value) { page_size = value; };
+    MemoryAddressSpace & GetAddressSpace() { return rm; };
 
     uint64_t GetRealMemorySize() { return rm_size; };
     uint64_t GetArchiveEnviromentSize() { return ae_size; };
     uint64_t GetPageSize() { return page_size; };
-
-    Computer(); // Конструктор по-умолчанию
 };
 
 class CPU : public Agent {
@@ -51,10 +80,9 @@ class OS : public Agent {
         управления ВП, в том числе обеспечивает ТП.
     */
 
-    TranslationRecord *translation_table[MAX_PROCESS_NUM]; // массив ТП
-    int current_translation_table_index; // текущий свободный слева индекс в массиве ТП.
-    // Например, если существуют две ТП, то этот индекс будет равен 2, так как 0,1 индексы уже заняты.
-    
+    TranslationTable *translation_tables[MAX_PROCESS_NUM];
+    int current_translation_table_index = 0;
+
     public:
     void CallCPU(bool WriteFlag); // Вызов процессора для решения задачи преобразования виртуального адреса
     void HandleInterruption(); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
@@ -63,7 +91,6 @@ class OS : public Agent {
     void Wait();
     void Start();
 
-    OS();
     ~OS(); // Деструктор для освобождения динамически выделенной памяти
 };
 
@@ -86,7 +113,7 @@ class Process : public Agent {
         Остальные модели будут являться наследниками этого класс
      */ 
     int translation_table_index; // идентификатор процесса (для связки с ТП)
-    uint64_t memory_usage; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
+    uint64_t memory_usage = DEFAULT_MEMORY_USAGE; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
 
     public:
 
@@ -94,7 +121,6 @@ class Process : public Agent {
     void SetMemoryUsage(uint64_t value) { memory_usage = value; };
     uint64_t GetMemoryUsage() { return memory_usage; };
     
-    Process(); // конструктор по-умолчанию
     void MemoryRequest(bool WriteFlag); // запрос памяти
     void Start(); // Стартует процесс загрузки себя в память (равносильно запуску исполняемого файла)
     
