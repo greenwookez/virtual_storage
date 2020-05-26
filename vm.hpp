@@ -7,7 +7,9 @@ using namespace std;
 struct TranslationRecord { // Запись в таблице переадресации
     uint64_t virtual_address; // Адрес из ВАП
     uint64_t real_address; // Адрес из РАП (при наличии)
-    uint64_t attribute; // Атрибут записи (при наличии)
+    bool is_valid = false; // бит действительности
+    bool is_requested = false; // бит обращений
+    bool is_changed = false; // бит изменения
 };
 
 class TranslationTable {
@@ -20,7 +22,9 @@ class TranslationTable {
     int GetIndex() { return index; };
 
     void AddRecord(TranslationRecord input);
+    void EditRecord(uint64_t virtual_address, TranslationRecord input);
 };
+
 struct MemoryRecord {
     bool is_allocated = 0; // флаг распределения, по умолчанию все страницы НЕ распределены
     // здесь можно добавить какие-либо ещё данные
@@ -84,7 +88,7 @@ class OS : public Agent {
     int current_translation_table_index = 0;
 
     public:
-    void CallCPU(bool WriteFlag); // Вызов процессора для решения задачи преобразования виртуального адреса
+    void CallCPU(bool WriteFlag, int tt_index); // Вызов процессора для решения задачи преобразования виртуального адреса
     void HandleInterruption(); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
     void IntitializeProcess(Process * _process); // Моделируется загрузка процесса в память
     

@@ -29,6 +29,15 @@ extern Computer *g_pComputer;
         records[free_record] = input;
         free_record++;
     };
+
+    void TranslationTable :: EditRecord(uint64_t virtual_address, TranslationRecord input) {
+        for (int i = 0; i < free_record; i++) {
+            if (records[i].virtual_address == virtual_address) {
+                records[i] = input;
+                return;
+            }
+        }
+    };
 /* end of class TranslationTable */
 
 int randomizer(int max) { // Функция, возвращающая любое число от 0 до max.
@@ -68,17 +77,19 @@ int randomizer(int max) { // Функция, возвращающая любое
 /* end of class CPU */
 
 /* class OS */
-    void OS :: CallCPU(bool WriteFlag) {
-        /*
-            ОС выделяет виртуальный адрес процессу, так как она выполняет функции
-            виртуальной памяти. Пока он рандомный...
-            TODO: Полностью переработать
-        */
-        PageNumber address = rand() % g_pComputer->GetRealMemorySize(); 
+    // void OS :: CallCPU(bool WriteFlag, int tt_index) {
+    //     /*
+    //         ОС выделяет виртуальный адрес процессу, так как она выполняет функции
+    //         виртуальной памяти. Пока он рандомный...
+    //         TODO: Полностью переработать
+    //     */
+    //     PageNumber address = rand() % g_pComputer->GetRealMemorySize(); 
         
-        //Log("Calling CPU with WriteFlag = " + to_string(WriteFlag));
-        Schedule(GetTime()+TIME_FOR_CALLCPU, g_pCPU, &CPU::Convert, address);
-    };
+    //     translation_tables[tt_index]->EditRecord();
+        
+    //     //Log("Calling CPU with WriteFlag = " + to_string(WriteFlag));
+    //     Schedule(GetTime()+TIME_FOR_CALLCPU, g_pCPU, &CPU::Convert, address);
+    // };
 
     void OS :: HandleInterruption() {
         Log("Got an Interruption.");
