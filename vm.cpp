@@ -9,18 +9,28 @@ extern CPU *g_pCPU;
 extern Computer *g_pComputer;
 
 /* class MemoryAddressSpace */
-    PageNumber MemoryAddressSpace :: Allocate(){
+    PageNumber OS :: Allocate() {
         for (int i = 0; i < DEFAULT_TRANSLATION_TABLE_SIZE; i++) {
-            if (memory[i].is_allocated == false) {
-                memory[i].is_allocated = true;
+            if (g_pComputer->GetAddressSpace().GetPageByAddress(i).is_allocated == false) {
+                g_pComputer->GetAddressSpace().GetPageByAddress(i).is_allocated = true;
                 // может быть ещё какие-то данные нужно будеть здесь установить
-
                 return i;
             };
         };
 
-        //TODO: случай, когда нераспределённой памяти нет
+        Substitute();
     };
+
+    PageNumber OS :: Substitute() {
+        /*
+            Для начала модель, решающая задачу размещения, будет выбирать любой
+            адрес абсолютно рандомно.
+        */
+       int tmp = randomizer(g_pComputer->GetRealMemorySize());
+       translation_tables[current_table_index]->EditRecord();
+       g_pComputer->GetAddressSpace().GetPageByAddress();
+    };
+
 
 /* end of class MemoryAddressSpace */
 
@@ -30,9 +40,18 @@ extern Computer *g_pComputer;
         free_record++;
     };
 
-    void TranslationTable :: EditRecord(uint64_t virtual_address, TranslationRecord input) {
+    void TranslationTable :: EditRecord(VirtualAddress _virtual_address, TranslationRecord input) {
         for (int i = 0; i < free_record; i++) {
-            if (records[i].virtual_address == virtual_address) {
+            if (records[i].virtual_address == _virtual_address) {
+                records[i] = input;
+                return;
+            }
+        }
+    };
+
+    void TranslationTable :: EditRecord(RealAddress _real_address, TranslationRecord input) {
+        for (int i = 0; i < free_record; i++) {
+            if (records[i].real_address == _real_address) {
                 records[i] = input;
                 return;
             }
@@ -102,14 +121,18 @@ int randomizer(int max) { // Функция, возвращающая любое
         */
 
         // Создаём новую ТП для этого процесса
-        translation_tables[current_translation_table_index] = new TranslationTable;
-        _process->SetTranslationTableIndex(current_translation_table_index);
-        current_translation_table_index++;
+        translation_tables[free_table_index] = new TranslationTable;
+        _process->SetTranslationTableIndex(free_table_index);
+        current_table_index = free_table_index; // активная ТП - теперь ТП этого процесса
+
+        
+
         
         // Пока предположим, что каждый процесс занимает одну страницу в памяти
-        TranslationRecord tmp = { 0, g_pComputer->GetAddressSpace().Allocate(),0 }; // по виртуальному адресу 0 будет храниться
-        translation_tables[current_translation_table_index]->AddRecord(tmp);
 
+        TranslationRecord tmp = { 0, /* TODO */,0 }; // по виртуальному адресу 0 будет храниться
+        translation_tables[free_table_index]->AddRecord(tmp);
+        free_table_index++;
 
         Schedule(GetTime()+TIME_FOR_PROCESS_INITIALIZATION, _process, &Process::Work);
     };
@@ -128,7 +151,7 @@ int randomizer(int max) { // Функция, возвращающая любое
             Деструктор, освобождающий динамически выделенную память.
         */
         int i;
-        for (i = 0; i < current_translation_table_index; i++) {
+        for (i = 0; i < free_table_index; i++) {
             delete translation_tables[i];
         };
     };

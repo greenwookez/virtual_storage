@@ -2,11 +2,13 @@
 #include "config.hpp"
 
 using namespace std;
-
+typedef uint64_t PageNumber;
+typedef PageNumber VirtualAddress;
+typedef PageNumber RealAddress;
 
 struct TranslationRecord { // Запись в таблице переадресации
-    uint64_t virtual_address; // Адрес из ВАП
-    uint64_t real_address; // Адрес из РАП (при наличии)
+    VirtualAddress virtual_address; // Адрес из ВАП
+    RealAddress real_address; // Адрес из РАП (при наличии)
     bool is_valid = false; // бит действительности
     bool is_requested = false; // бит обращений
     bool is_changed = false; // бит изменения
@@ -22,7 +24,8 @@ class TranslationTable {
     int GetIndex() { return index; };
 
     void AddRecord(TranslationRecord input);
-    void EditRecord(uint64_t virtual_address, TranslationRecord input);
+    void EditRecord(VirtualAddress _virtual_address, TranslationRecord input);
+    void EditRecord(RealAddress _real_address, TranslationRecord input); // изменяет запись, зная реальный адрес
 };
 
 struct MemoryRecord {
@@ -34,10 +37,8 @@ class MemoryAddressSpace { // РАП
     MemoryRecord memory[DEFAULT_REAL_MEMORY_SIZE];
 
     public:
-    void SetPageByAddress(MemoryRecord input, PageNumber address) { memory[address] = input; };
-    MemoryRecord GetPageByAddress(PageNumber address) { return memory[address]; };
-
-    PageNumber Allocate();
+    void SetPageByAddress(MemoryRecord input, RealAddress address) { memory[address] = input; };
+    MemoryRecord & GetPageByAddress(RealAddress address) { return memory[address]; };
 };
 
 class Process; // Заголовок класса Process (для класса OS)
@@ -71,7 +72,6 @@ class CPU : public Agent {
         Класс, который моделирует работу процессора.
     */
     public:
-
     void Convert(PageNumber address); // Метод, решающий задачу преобразования виртуального адреса
     
     void Wait();
@@ -85,12 +85,15 @@ class OS : public Agent {
     */
 
     TranslationTable *translation_tables[MAX_PROCESS_NUM];
-    int current_translation_table_index = 0;
+    int free_table_index = 0;
+    int current_table_index = 0;
 
     public:
     void CallCPU(bool WriteFlag, int tt_index); // Вызов процессора для решения задачи преобразования виртуального адреса
     void HandleInterruption(); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
     void IntitializeProcess(Process * _process); // Моделируется загрузка процесса в память
+    PageNumber Allocate(); // размещение
+    PageNumber Substitute(); // замещение
     
     void Wait();
     void Start();

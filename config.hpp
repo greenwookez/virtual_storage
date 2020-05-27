@@ -1,6 +1,3 @@
-typedef uint64_t PageNumber;
-typedef uint64_t SimulatorTime;
-
 /* КОНФИГУРАЦИЯ КОМПЬЮТЕРА */
 const uint64_t DEFAULT_REAL_MEMORY_SIZE = 20000; // Размер реальной памяти в страницах
 const uint64_t DEFAULT_ARCHIVE_ENVIROMENT_SIZE = 50; // Размер архивной среды в страницах
