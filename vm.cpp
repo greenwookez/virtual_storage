@@ -9,54 +9,59 @@ extern CPU *g_pCPU;
 extern Computer *g_pComputer;
 
 /* class MemoryAddressSpace */
-    PageNumber OS :: Allocate() {
-        for (int i = 0; i < DEFAULT_TRANSLATION_TABLE_SIZE; i++) {
-            if (g_pComputer->GetAddressSpace().GetPageByAddress(i).is_allocated == false) {
-                g_pComputer->GetAddressSpace().GetPageByAddress(i).is_allocated = true;
-                // может быть ещё какие-то данные нужно будеть здесь установить
-                return i;
-            };
-        };
-
-        Substitute();
-    };
-
-    PageNumber OS :: Substitute() {
-        /*
-            Для начала модель, решающая задачу размещения, будет выбирать любой
-            адрес абсолютно рандомно.
-        */
-       int tmp = randomizer(g_pComputer->GetRealMemorySize());
-       translation_tables[current_table_index]->EditRecord();
-       g_pComputer->GetAddressSpace().GetPageByAddress();
-    };
-
 
 /* end of class MemoryAddressSpace */
 
 /* class TranslationTable */
-    void TranslationTable :: AddRecord(TranslationRecord input) {
+    void TranslationTable :: AddRecord(TranslationTableRecord input) {
         records[free_record] = input;
         free_record++;
     };
 
-    void TranslationTable :: EditRecord(VirtualAddress _virtual_address, TranslationRecord input) {
+    void TranslationTable :: EditRecord(VirtualAddress _virtual_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag) {
+        
+        
         for (int i = 0; i < free_record; i++) {
             if (records[i].virtual_address == _virtual_address) {
-                records[i] = input;
+                if (input_vaddress != -1) {
+                    records[i].virtual_address = input_vaddress;
+                };
+
+                if (input_raddress != -1) {
+                    records[i].real_address = input_raddress;
+                };
+
+                records[i].is_valid = valid_flag;
                 return;
             }
         }
     };
 
-    void TranslationTable :: EditRecord(RealAddress _real_address, TranslationRecord input) {
+    void TranslationTable :: EditRecord(RealAddress _real_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag) {
         for (int i = 0; i < free_record; i++) {
             if (records[i].real_address == _real_address) {
-                records[i] = input;
+                if (input_vaddress != -1) {
+                    records[i].virtual_address = input_vaddress;
+                };
+
+                if (input_raddress != -1) {
+                    records[i].real_address = input_raddress;
+                };
+
+                records[i].is_valid = valid_flag;
                 return;
             }
         }
     };
+
+    TranslationTableRecord TranslationTable :: GetRecord(RealAddress _real_address) {
+        for (int i = 0; i < free_record; i++) {
+            if (records[i].real_address == _real_address) {
+                return records[i];
+            }
+        }
+    };
+
 /* end of class TranslationTable */
 
 int randomizer(int max) { // Функция, возвращающая любое число от 0 до max.
@@ -122,7 +127,7 @@ int randomizer(int max) { // Функция, возвращающая любое
 
         // Создаём новую ТП для этого процесса
         translation_tables[free_table_index] = new TranslationTable;
-        _process->SetTranslationTableIndex(free_table_index);
+        translation_tables[free_table_index]->SetProcess(_process);
         current_table_index = free_table_index; // активная ТП - теперь ТП этого процесса
 
         
@@ -130,11 +135,62 @@ int randomizer(int max) { // Функция, возвращающая любое
         
         // Пока предположим, что каждый процесс занимает одну страницу в памяти
 
-        TranslationRecord tmp = { 0, /* TODO */,0 }; // по виртуальному адресу 0 будет храниться
+        TranslationTableRecord tmp = { 0, Allocate(_process),0 }; // по виртуальному адресу 0 будет храниться
         translation_tables[free_table_index]->AddRecord(tmp);
         free_table_index++;
 
         Schedule(GetTime()+TIME_FOR_PROCESS_INITIALIZATION, _process, &Process::Work);
+    };
+
+    RealAddress OS :: Allocate(Process * _process) {
+        /*
+            Метод, решающий задачу размещения.
+        */
+        for (int i = 0; i < g_pComputer->GetRealMemorySize(); i++) {
+            if (g_pComputer->GetMemoryAddressSpace().GetPageByAddress(i).is_allocated == false) {
+                g_pComputer->GetMemoryAddressSpace().GetPageByAddress(i).is_allocated = true;
+                // может быть ещё какие-то данные нужно будеть здесь установить
+                return i;
+            };
+        };
+
+        Substitute(_process);
+    };
+
+    RealAddress OS :: Substitute(Process *_process) {
+        /*
+            Для начала модель, решающая задачу замещения, будет выбирать любой
+            адрес абсолютно рандомно.
+        */
+        int index = -1;
+        RealAddress tmp;
+        while (index == -1) { // В цикле найдём нужную ТП
+            tmp = (RealAddress)randomizer(g_pComputer->GetRealMemorySize());
+            index = FindTableByValidAddress(tmp);
+        };
+
+        translation_tables[index]->EditRecord(tmp, -1, -1, false); // -1 значит, что это значение изменяться не будет
+        
+
+        //Загрузить в АС содержимое адреса tmp
+        g_pAE->LoadData(_process, translation_tables[index]->GetRecord(tmp).virtual_address);
+    };
+
+    int OS :: FindTableByValidAddress(RealAddress _address) {
+        /*
+            Ищет ТП, в который адрес _address является доступным.
+        */
+
+        for (int i = 0; i < MAX_PROCESS_NUM; i++) {
+            for (int j = 0; j < DEFAULT_TRANSLATION_TABLE_SIZE; j++) {
+                TranslationTableRecord *tmp = translation_tables[i]->GetRecords();
+                if (tmp[j].real_address == _address && tmp[j].is_valid == true) {
+                    return i;
+                }
+            }
+        }
+
+        return -1;
     };
 
     void OS :: Wait() {
@@ -156,6 +212,32 @@ int randomizer(int max) { // Функция, возвращающая любое
         };
     };
 /* end of class OS */
+
+/* class AE */
+    void AE :: LoadData(Process *_p_process, VirtualAddress _virtual_address) {
+        int i;
+        for (i = 0; i < DEFAULT_ARCHIVE_DISK_SPACE_SIZE; i++) {
+            if (g_pComputer->GetDiskAddressSpace().GetPageByAddress(i).is_allocated == false) {
+                g_pComputer->GetDiskAddressSpace().GetPageByAddress(i).is_allocated = true;
+                break;
+            };
+        };
+
+        SwapIndex[free_swap_index] = {_p_process, _virtual_address, i};
+        free_swap_index++;
+    };
+
+    void AE :: PopData(Process *_process, VirtualAddress _virtual_address) {
+        for (int i = 0; i < DEFAULT_ARCHIVE_ENVIROMENT_SIZE; i++) {
+            if (SwapIndex[i].p_process == _process && SwapIndex[i].virtual_address == _virtual_address) {
+                g_pComputer->GetDiskAddressSpace().GetPageByAddress(SwapIndex[i].disk_address).is_allocated = false;
+                SwapIndex[i].p_process = nullptr;
+                SwapIndex[i].virtual_address = -1;
+                return;
+            };
+        };
+    };
+/* end of class AE*/
 
 /* class Process */
     void Process :: MemoryRequest(bool WriteFlag) {

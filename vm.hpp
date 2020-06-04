@@ -5,27 +5,31 @@ using namespace std;
 typedef uint64_t PageNumber;
 typedef PageNumber VirtualAddress;
 typedef PageNumber RealAddress;
+typedef PageNumber DiskAddress;
 
-struct TranslationRecord { // Запись в таблице переадресации
-    VirtualAddress virtual_address; // Адрес из ВАП
-    RealAddress real_address; // Адрес из РАП (при наличии)
-    bool is_valid = false; // бит действительности
-    bool is_requested = false; // бит обращений
-    bool is_changed = false; // бит изменения
+struct TranslationTableRecord { // Запись в таблице переадресации
+    VirtualAddress virtual_address = -1; // Адрес из ВАП
+    RealAddress real_address = -1; // Адрес из РАП (при наличии)
+    bool is_valid = true; // бит действительности
 };
 
 class TranslationTable {
-    TranslationRecord records[DEFAULT_TRANSLATION_TABLE_SIZE]; // массив записей
+    Process *p_process;
+    TranslationTableRecord records[DEFAULT_TRANSLATION_TABLE_SIZE]; // массив записей
     int index; // индекс ТП
     int free_record = 0; // индекс текущей первой свободной записи в массиве records
 
     public:
+    void SetProcess(Process * _process) { p_process = _process; };
+    Process *GetProcess() { return p_process; };
     void SetIndex(int value) { index = value; };
     int GetIndex() { return index; };
+    TranslationTableRecord *GetRecords() { return records; };
 
-    void AddRecord(TranslationRecord input);
-    void EditRecord(VirtualAddress _virtual_address, TranslationRecord input);
-    void EditRecord(RealAddress _real_address, TranslationRecord input); // изменяет запись, зная реальный адрес
+    void AddRecord(TranslationTableRecord input);
+    void EditRecord(VirtualAddress _virtual_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag);
+    void EditRecord(RealAddress _real_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag ); // изменяет запись, зная реальный адрес
+    TranslationTableRecord GetRecord(RealAddress _real_address);
 };
 
 struct MemoryRecord {
@@ -37,8 +41,14 @@ class MemoryAddressSpace { // РАП
     MemoryRecord memory[DEFAULT_REAL_MEMORY_SIZE];
 
     public:
-    void SetPageByAddress(MemoryRecord input, RealAddress address) { memory[address] = input; };
     MemoryRecord & GetPageByAddress(RealAddress address) { return memory[address]; };
+};
+
+  class DiskAddressSpace { // ААП
+    MemoryRecord memory[DEFAULT_ARCHIVE_DISK_SPACE_SIZE];
+
+    public:
+    MemoryRecord & GetPageByAddress(DiskAddress address) { return memory[address]; };
 };
 
 class Process; // Заголовок класса Process (для класса OS)
@@ -49,19 +59,20 @@ class Computer {
         Здесь также будут высчитываться загруженность системы
         и накладные расходы на страничный обмен.
     */
-
+    // TODO: Убрать рудименты ниже
     uint64_t rm_size = DEFAULT_REAL_MEMORY_SIZE; // размер реальной памяти
     uint64_t ae_size = DEFAULT_ARCHIVE_ENVIROMENT_SIZE; // размер архивной среды
     uint64_t page_size = DEFAULT_PAGE_SIZE; // размер страницы в байтах в виде степени двойки
     
     MemoryAddressSpace rm; // РАП
+    DiskAddressSpace archive;
 
     public:
     void SetRealMemorySize(uint64_t value) { rm_size = value; };
     void SetArchiveEnviromentSize(uint64_t value) { ae_size = value; };
     void SetPageSize(uint64_t value) { page_size = value; };
-    MemoryAddressSpace & GetAddressSpace() { return rm; };
-
+    MemoryAddressSpace & GetMemoryAddressSpace() { return rm; };
+    DiskAddressSpace & GetDiskAddressSpace() { return archive; };
     uint64_t GetRealMemorySize() { return rm_size; };
     uint64_t GetArchiveEnviromentSize() { return ae_size; };
     uint64_t GetPageSize() { return page_size; };
@@ -92,9 +103,9 @@ class OS : public Agent {
     void CallCPU(bool WriteFlag, int tt_index); // Вызов процессора для решения задачи преобразования виртуального адреса
     void HandleInterruption(); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
     void IntitializeProcess(Process * _process); // Моделируется загрузка процесса в память
-    PageNumber Allocate(); // размещение
-    PageNumber Substitute(); // замещение
-    
+    RealAddress Allocate(Process * _process); // размещение
+    RealAddress Substitute(Process * _process); // замещение
+    int FindTableByValidAddress(RealAddress _address);
     void Wait();
     void Start();
 
@@ -108,23 +119,34 @@ class AE : public Agent {
     /*
         Класс, который моделирует работу архивной среды.
     */
+   
+    struct SwapIndexRecord {
+        Process *p_process = nullptr;
+        VirtualAddress virtual_address = -1;
+        DiskAddress disk_address;
+    };
+
+    SwapIndexRecord SwapIndex[DEFAULT_ARCHIVE_ENVIROMENT_SIZE];
+    int free_swap_index = 0;
 
     public:
+    void LoadData(Process *_p_process, VirtualAddress _virtual_address);
+    void PopData(Process *_process, VirtualAddress _virtual_address);
+
     void Wait();
     void Start();
 };
+
+extern AE *g_pAE;
 
 class Process : public Agent {
     /* 
         Класс - базовая модель процесса.
         Остальные модели будут являться наследниками этого класс
      */ 
-    int translation_table_index; // идентификатор процесса (для связки с ТП)
     uint64_t memory_usage = DEFAULT_MEMORY_USAGE; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
 
     public:
-
-    void SetTranslationTableIndex(int value) { translation_table_index = value; }
     void SetMemoryUsage(uint64_t value) { memory_usage = value; };
     uint64_t GetMemoryUsage() { return memory_usage; };
     

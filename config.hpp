@@ -1,6 +1,7 @@
 /* КОНФИГУРАЦИЯ КОМПЬЮТЕРА */
 const uint64_t DEFAULT_REAL_MEMORY_SIZE = 20000; // Размер реальной памяти в страницах
-const uint64_t DEFAULT_ARCHIVE_ENVIROMENT_SIZE = 50; // Размер архивной среды в страницах
+const uint64_t DEFAULT_ARCHIVE_ENVIROMENT_SIZE = 50; // Размер архивной среды в страницах (размер массива структуры SwapIndexRecord)
+const uint64_t DEFAULT_ARCHIVE_DISK_SPACE_SIZE = 50; // Размер файла подкачки в страницах
 const uint64_t DEFAULT_PAGE_SIZE = 11; // Размер страницы в байтах (представлен в виде показателя степени 2)
 const uint64_t DEFAULT_TRANSLATION_TABLE_SIZE = 100; // Размер таблицы переадресации
 

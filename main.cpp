@@ -10,6 +10,7 @@ Sim *g_pSim;
 OS *g_pOS;
 CPU *g_pCPU;
 Computer *g_pComputer;
+AE *g_pAE;
 
 int main()
 {
