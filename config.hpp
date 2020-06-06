@@ -9,10 +9,12 @@ const uint64_t DEFAULT_TRANSLATION_TABLE_SIZE = 100; // Размер табли�
 const uint64_t DEFAULT_MEMORY_USAGE = 1; // Память, занимаемая процессом в количестве страниц 
 
 /* ТАЙМИНГИ ВСЕХ ПРОЦЕССОВ */
-const SimulatorTime TIME_FOR_CALLCPU = 100;
 const SimulatorTime TIME_FOR_MEMORYREQUEST = 200;
 const SimulatorTime TIME_FOR_CONVERSION = 300;
 const SimulatorTime TIME_FOR_PROCESS_INITIALIZATION = 200;
+const SimulatorTime TIME_FOR_SETTING_CURRENT_TABLE = 100;
+const SimulatorTime TIME_FOR_LOADING_DATA_IN_AE = 100;
+const SimulatorTime TIME_FOR_ALLOCATION = 200;
 
 /* ДРУГОЕ */
 const int DEFAULT_MATRIX_SIZE_FOR_MYPROCESS = 3; // Размер квадратной матрицы в методе Work класса MyProcess

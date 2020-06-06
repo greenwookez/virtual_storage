@@ -8,9 +8,9 @@ typedef PageNumber RealAddress;
 typedef PageNumber DiskAddress;
 
 struct TranslationTableRecord { // Запись в таблице переадресации
-    VirtualAddress virtual_address = -1; // Адрес из ВАП
+    VirtualAddress virtual_address; // Адрес из ВАП
     RealAddress real_address = -1; // Адрес из РАП (при наличии)
-    bool is_valid = true; // бит действительности
+    bool is_valid = false; // бит действительности
 };
 
 class TranslationTable {
@@ -20,6 +20,8 @@ class TranslationTable {
     int free_record = 0; // индекс текущей первой свободной записи в массиве records
 
     public:
+    TranslationTable();
+
     void SetProcess(Process * _process) { p_process = _process; };
     Process *GetProcess() { return p_process; };
     void SetIndex(int value) { index = value; };
@@ -30,6 +32,7 @@ class TranslationTable {
     void EditRecord(VirtualAddress _virtual_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag);
     void EditRecord(RealAddress _real_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag ); // изменяет запись, зная реальный адрес
     TranslationTableRecord GetRecord(RealAddress _real_address);
+    TranslationTableRecord &GetRecord(int index) { return records[index]; };
 };
 
 struct MemoryRecord {
@@ -44,7 +47,7 @@ class MemoryAddressSpace { // РАП
     MemoryRecord & GetPageByAddress(RealAddress address) { return memory[address]; };
 };
 
-  class DiskAddressSpace { // ААП
+class DiskAddressSpace { // ААП
     MemoryRecord memory[DEFAULT_ARCHIVE_DISK_SPACE_SIZE];
 
     public:
@@ -83,7 +86,7 @@ class CPU : public Agent {
         Класс, который моделирует работу процессора.
     */
     public:
-    void Convert(PageNumber address); // Метод, решающий задачу преобразования виртуального адреса
+    void Convert(VirtualAddress address, bool write_flag); // Метод, решающий задачу преобразования виртуального адреса
     
     void Wait();
     void Start();
@@ -101,14 +104,16 @@ class OS : public Agent {
 
     public:
     void CallCPU(bool WriteFlag, int tt_index); // Вызов процессора для решения задачи преобразования виртуального адреса
-    void HandleInterruption(); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
+    void HandleInterruption(VirtualAddress vaddress); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
     void IntitializeProcess(Process * _process); // Моделируется загрузка процесса в память
-    RealAddress Allocate(Process * _process); // размещение
-    RealAddress Substitute(Process * _process); // замещение
+    void Allocate(VirtualAddress vaddress); // размещение
+    void Substitute(VirtualAddress vaddress); // замещение
+    void SetCurrentTable(Process *_process);
     int FindTableByValidAddress(RealAddress _address);
     void Wait();
     void Start();
 
+    TranslationTable GetCurrentTranslationTable() { return *translation_tables[current_table_index]; };
     ~OS(); // Деструктор для освобождения динамически выделенной памяти
 };
 
@@ -130,8 +135,8 @@ class AE : public Agent {
     int free_swap_index = 0;
 
     public:
-    void LoadData(Process *_p_process, VirtualAddress _virtual_address);
-    void PopData(Process *_process, VirtualAddress _virtual_address);
+    void LoadData(VirtualAddress address);
+    void PopData(VirtualAddress address);
 
     void Wait();
     void Start();
@@ -150,7 +155,7 @@ class Process : public Agent {
     void SetMemoryUsage(uint64_t value) { memory_usage = value; };
     uint64_t GetMemoryUsage() { return memory_usage; };
     
-    void MemoryRequest(bool WriteFlag); // запрос памяти
+    void MemoryRequest(VirtualAddress virtual_address, bool write_flag; // запрос памяти
     void Start(); // Стартует процесс загрузки себя в память (равносильно запуску исполняемого файла)
     
     virtual void Work();
