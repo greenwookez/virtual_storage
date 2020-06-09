@@ -13,6 +13,26 @@ struct TranslationTableRecord { // Запись в таблице переадр
     bool is_valid = false; // бит действительности
 };
 
+class Process : public Agent {
+    /* 
+        Класс - базовая модель процесса.
+        Остальные модели будут являться наследниками этого класс
+     */ 
+    uint64_t memory_usage = DEFAULT_MEMORY_USAGE; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
+
+    public:
+    void SetMemoryUsage(uint64_t value) { memory_usage = value; };
+    uint64_t GetMemoryUsage() { return memory_usage; };
+    
+    void MemoryRequest(VirtualAddress virtual_address, bool write_flag); // запрос памяти
+    void Start(); // Стартует процесс загрузки себя в память (равносильно запуску исполняемого файла)
+    
+    virtual void Work();
+    void Wait();
+    
+    
+};
+
 class TranslationTable {
     Process *p_process;
     TranslationTableRecord records[DEFAULT_TRANSLATION_TABLE_SIZE]; // массив записей
@@ -29,10 +49,8 @@ class TranslationTable {
     TranslationTableRecord *GetRecords() { return records; };
 
     void AddRecord(TranslationTableRecord input);
-    void EditRecord(VirtualAddress _virtual_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag);
     void EditRecord(RealAddress _real_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag ); // изменяет запись, зная реальный адрес
-    TranslationTableRecord GetRecord(RealAddress _real_address);
-    TranslationTableRecord &GetRecord(int index) { return records[index]; };
+    TranslationTableRecord &GetRecord(VirtualAddress index) { return records[index]; };
 };
 
 struct MemoryRecord {
@@ -53,8 +71,6 @@ class DiskAddressSpace { // ААП
     public:
     MemoryRecord & GetPageByAddress(DiskAddress address) { return memory[address]; };
 };
-
-class Process; // Заголовок класса Process (для класса OS)
 
 class Computer {
     /*
@@ -79,6 +95,7 @@ class Computer {
     uint64_t GetRealMemorySize() { return rm_size; };
     uint64_t GetArchiveEnviromentSize() { return ae_size; };
     uint64_t GetPageSize() { return page_size; };
+    void PrintCurrentConfig();
 };
 
 class CPU : public Agent {
@@ -138,31 +155,11 @@ class AE : public Agent {
     void LoadData(VirtualAddress address);
     void PopData(VirtualAddress address);
 
-    void Wait();
     void Start();
+    void Wait();
 };
 
 extern AE *g_pAE;
-
-class Process : public Agent {
-    /* 
-        Класс - базовая модель процесса.
-        Остальные модели будут являться наследниками этого класс
-     */ 
-    uint64_t memory_usage = DEFAULT_MEMORY_USAGE; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
-
-    public:
-    void SetMemoryUsage(uint64_t value) { memory_usage = value; };
-    uint64_t GetMemoryUsage() { return memory_usage; };
-    
-    void MemoryRequest(VirtualAddress virtual_address, bool write_flag; // запрос памяти
-    void Start(); // Стартует процесс загрузки себя в память (равносильно запуску исполняемого файла)
-    
-    virtual void Work();
-    void Wait();
-    
-    
-};
 
 class MyProcess : public Process {
     public:

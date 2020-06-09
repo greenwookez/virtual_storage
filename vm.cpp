@@ -3,6 +3,10 @@
 #include <cstdint>
 #include <ctime>
 #include <unistd.h>
+#include <iostream>
+#include <iomanip>
+
+using namespace std;
 
 extern Sim *g_pSim;
 extern OS *g_pOS;
@@ -28,25 +32,6 @@ extern AE *g_pAE;
         free_record++;
     };
 
-    void TranslationTable :: EditRecord(VirtualAddress _virtual_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag) {
-        
-        
-        for (int i = 0; i < free_record; i++) {
-            if (records[i].virtual_address == _virtual_address) {
-                if (input_vaddress != -1) {
-                    records[i].virtual_address = input_vaddress;
-                };
-
-                if (input_raddress != -1) {
-                    records[i].real_address = input_raddress;
-                };
-
-                records[i].is_valid = valid_flag;
-                return;
-            }
-        }
-    };
-
     void TranslationTable :: EditRecord(RealAddress _real_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag) {
         for (int i = 0; i < free_record; i++) {
             if (records[i].real_address == _real_address) {
@@ -60,14 +45,6 @@ extern AE *g_pAE;
 
                 records[i].is_valid = valid_flag;
                 return;
-            }
-        }
-    };
-
-    TranslationTableRecord TranslationTable :: GetRecord(RealAddress _real_address) {
-        for (int i = 0; i < free_record; i++) {
-            if (records[i].real_address == _real_address) {
-                return records[i];
             }
         }
     };
@@ -107,59 +84,72 @@ extern AE *g_pAE;
         /*
             В этом методе моделируются действия по загрузке кода процесса в память.
         */
-
+        Log("Initializing process " + _process->GetName());
         // Создаём новую ТП для этого процесса
         translation_tables[free_table_index] = new TranslationTable;
         translation_tables[free_table_index]->SetProcess(_process);
         current_table_index = free_table_index; // активная ТП - теперь ТП этого процесса
 
         
-        //TODO: Переделать через Allocate()
         // Заполняем нужное количетво записей в ТП
-        TranslationTableRecord tmp;
-        for (int i = 0; i < _process->GetMemoryUsage(); i++) {
-            translation_tables[free_table_index]->GetRecord(i).;
-            free_table_index++;
-        };
+        for (int i = 0; i < _process->GetMemoryUsage(); i++)
+            Schedule(GetTime()+TIME_FOR_ALLOCATION, g_pOS, &OS::Allocate, i);
+
         Schedule(GetTime()+TIME_FOR_PROCESS_INITIALIZATION, _process, &Process::Work);
+        free_table_index++;
+        return;
     };
 
     void OS :: HandleInterruption(VirtualAddress vaddress) {
         Log("Got an Interruption.");
-        Process * caller = translation_tables[current_table_index]->GetProcess();
 
-        
+        // При обработке прерывания выполняем задачу размещения
         Schedule(GetTime()+TIME_FOR_ALLOCATION, g_pOS, &OS::Allocate, vaddress);
         
         // И передадим управление обратно на процесс
+        Process * caller = translation_tables[current_table_index]->GetProcess();
         Schedule(GetTime(), caller, &Process::Wait);
     };
 
     void OS :: Allocate(VirtualAddress vaddress) {
+        Log("Allocating virtual address " + to_string(vaddress));
         Process * caller = translation_tables[current_table_index]->GetProcess();
         for (int i = 0; i < g_pComputer->GetRealMemorySize(); i++) {
             if (g_pComputer->GetMemoryAddressSpace().GetPageByAddress(i).is_allocated == false) {
                 // Если нашёлся свободный реальный адрес
                 g_pComputer->GetMemoryAddressSpace().GetPageByAddress(i).is_allocated = true;
                 // может быть ещё какие-то данные нужно будеть здесь установить
-                
-                
-                Schedule(GetTime(), caller, &Process::Wait); // Можно передать управление на любой другой метод
+                TranslationTableRecord tmp;
+                tmp.virtual_address = vaddress;
+                tmp.real_address = i;
+                tmp.is_valid = true;
+                translation_tables[current_table_index]->GetRecord(vaddress) = tmp;
+                Log("I have found out free real address " + to_string(i));
+                return;
             };
         };
 
         // Если свободного реального адреса нет в РАП, то решаем задачу замещения
+        Log("No free real addresses. Starting the redestribution");
         int index = -1;
         RealAddress tmp;
         while (index == -1) { // В цикле найдём нужную ТП
+            // Реализация выбора кандидата на перераспределение. В данном случае - рандомно.
             tmp = (RealAddress)randomizer(g_pComputer->GetRealMemorySize());
             index = FindTableByValidAddress(tmp);
         };
+        Log("Redistributing real address tmp " + to_string(tmp));
         translation_tables[index]->EditRecord(tmp, -1, -1, false); // -1 значит, что это значение изменяться не будет в структуре записи
-        //TODO: Проверить логику замены записи выше ^
+        TranslationTableRecord tmp2;
+        tmp2.virtual_address = vaddress;
+        tmp2.real_address = tmp;
+        tmp2.is_valid = true;
+        Log("Changing record with virtual address " + to_string(vaddress) + " in current translation table");
+        translation_tables[current_table_index]->GetRecord(vaddress) = tmp2;
 
         // Загрузим в АС содержимое реального адреса
         Schedule(GetTime()+TIME_FOR_LOADING_DATA_IN_AE, g_pAE, &AE::LoadData, tmp);
+        return;
     };
 
     void OS :: SetCurrentTable(Process *_process) {
@@ -211,6 +201,7 @@ extern AE *g_pAE;
 
 /* class AE */
     void AE :: LoadData(VirtualAddress address) {
+        Log("Loading virtual address " + to_string(address) + "data into AE");
         int i;
         Process * caller = g_pOS->GetCurrentTranslationTable().GetProcess();
         for (i = 0; i < DEFAULT_ARCHIVE_DISK_SPACE_SIZE; i++) {
@@ -219,9 +210,14 @@ extern AE *g_pAE;
                 break;
             };
         };
-
-        SwapIndex[free_swap_index] = {caller, address, i};
+        SwapIndexRecord tmp;
+        tmp.p_process = caller;
+        tmp.virtual_address = address;
+        tmp.disk_address = i;
+    
+        SwapIndex[free_swap_index] = tmp;
         free_swap_index++;
+        return;
     };
 
     void AE :: PopData(VirtualAddress address) {
@@ -234,6 +230,15 @@ extern AE *g_pAE;
                 break;
             };
         };
+        return;
+    };
+
+    void AE :: Start() {
+        Schedule(GetTime(), this, &AE::Wait);
+    }
+
+    void AE :: Wait() {
+        Log("I am waiting");
     };
 /* end of class AE*/
 
@@ -250,13 +255,14 @@ extern AE *g_pAE;
             по записи.
         */
 
-        int chance = randomizer(100);
-        bool write_flag = chance > 80;
-        Log("Chance for WriteFlag:" + to_string(chance));
-        MemoryRequest(write_flag);
+        // int chance = randomizer(100);
+        // bool write_flag = chance > 80;
+        // Log("Chance for WriteFlag:" + to_string(chance));
+        // MemoryRequest(write_flag);
     };
     
     void Process :: Start() {
+        Log("Starting...");
         Schedule(GetTime(), g_pOS, &OS::IntitializeProcess, this);
     };
 
@@ -268,30 +274,45 @@ extern AE *g_pAE;
 
 /* class MyProcess */
     void MyProcess :: Work() {
-        /*
-            В этом методе моделируется задача обращения матрицы большой размерности.
-            Алгоритм взят из источника: http://www.algolib.narod.ru/Math/ObrMatrix.html
-        */
+    //     /*
+    //         В этом методе моделируется задача обращения матрицы большой размерности.
+    //         Алгоритм взят из источника: http://www.algolib.narod.ru/Math/ObrMatrix.html
+    //     */
         
-        const int const_a = DEFAULT_MATRIX_SIZE_FOR_MYPROCESS;
-        float input[const_a][const_a];
-        float output[const_a][const_a];
-        int i,j,k;
-        for (k = 0; k <= const_a-1; k++) {
-            for (i = 0; i <= const_a-1; i++) {
-                for (j = 0; j <= const_a-1; j++) {
-                    if (i == k && j == k) {
-                        output[i][j] = 1 / input[i][j];
-                    } else if (i == k && j != k) {
-                        output[i][j] = -input[i][j]/input[k][k];
-                    } else if (i != k && j == k) {
-                        output[i][j] = input[i][k]/input[k][k];
-                    } else if (i != k && j != k) {
-                        output[i][j] = input[i][j] - input[k][j] * input[i][k]/input[k][k];
-                    }
-                    Process :: MemoryRequest(true);
-                }
-            }
-        }
+    //     const int const_a = DEFAULT_MATRIX_SIZE_FOR_MYPROCESS;
+    //     float input[const_a][const_a];
+    //     float output[const_a][const_a];
+    //     int i,j,k;
+    //     for (k = 0; k <= const_a-1; k++) {
+    //         for (i = 0; i <= const_a-1; i++) {
+    //             for (j = 0; j <= const_a-1; j++) {
+    //                 if (i == k && j == k) {
+    //                     output[i][j] = 1 / input[i][j];
+    //                 } else if (i == k && j != k) {
+    //                     output[i][j] = -input[i][j]/input[k][k];
+    //                 } else if (i != k && j == k) {
+    //                     output[i][j] = input[i][k]/input[k][k];
+    //                 } else if (i != k && j != k) {
+    //                     output[i][j] = input[i][j] - input[k][j] * input[i][k]/input[k][k];
+    //                 }
+    //                 Process :: MemoryRequest(true);
+    //             }
+    //         }
+    //     }
     };
 /* end of class MyProcess */
+
+/* class Computer */
+
+    void Computer :: PrintCurrentConfig() {
+        cout << "CURRENT CONFIG:" << endl;
+        cout << setw(10) << setfill(' ') << left <<  "RM Size"
+        << setw(5) << right << " = " << to_string(rm_size) << endl;
+
+        cout << setw(10) << setfill(' ') << left <<  "AE Size"
+        << setw(5) << right << " = " << to_string(ae_size) << endl;
+
+        cout << setw(10) << setfill(' ') << left <<  "Page Size"
+        << setw(5) << right << " = " << "2^" <<to_string(page_size) << endl;
+    };
+/* end of class Computer */

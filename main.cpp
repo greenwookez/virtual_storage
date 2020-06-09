@@ -16,7 +16,7 @@ int main()
 {
     g_pSim = new Sim;
 
-    g_pComputer = new Computer;
+    
     
     g_pOS = new OS;
     g_pOS->SetName("OS");
@@ -24,13 +24,16 @@ int main()
     g_pCPU = new CPU;
     g_pCPU->SetName("CPU");
     
+    g_pAE = new AE;
+    g_pAE->SetName("AE");
+
+    g_pComputer = new Computer;
+    g_pComputer->PrintCurrentConfig();
+
     MyProcess *pProcess01 = new MyProcess;
-    pProcess01->SetName("Process1");
+    pProcess01->SetName("Process01");
 
-    MyProcess *pProcess02 = new MyProcess;
-    pProcess02->SetName("Process2");
-
-    pProcess02->Start();
+    pProcess01->Start();
 
 
     g_pSim->SetLimit(30000);
@@ -51,11 +54,12 @@ int main()
     }
 
     delete pProcess01;
-    delete pProcess02;
+
     delete g_pSim;
     delete g_pComputer;
     delete g_pOS;
     delete g_pCPU;
+    delete g_pAE;
 
     return 0;
 }
