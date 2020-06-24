@@ -23,8 +23,11 @@ extern AE *g_pAE;
 
 /* class TranslationTable */
     TranslationTable :: TranslationTable()  {
-        for (int i = 0; i < DEFAULT_TRANSLATION_TABLE_SIZE; i++)
+        for (int i = 0; i < DEFAULT_TRANSLATION_TABLE_SIZE; i++) {
             records[i].virtual_address = i;
+            records[i].real_address = -1;
+            records[i].is_valid = false;
+        }
     };
 
     void TranslationTable :: AddRecord(TranslationTableRecord input) {
@@ -138,7 +141,7 @@ extern AE *g_pAE;
             tmp = (RealAddress)randomizer(g_pComputer->GetRealMemorySize());
             index = FindTableByValidAddress(tmp);
         };
-        Log("Redistributing real address tmp " + to_string(tmp));
+        Log("Redistributing real address " + to_string(tmp));
         translation_tables[index]->EditRecord(tmp, -1, -1, false); // -1 значит, что это значение изменяться не будет в структуре записи
         TranslationTableRecord tmp2;
         tmp2.virtual_address = vaddress;
@@ -201,7 +204,7 @@ extern AE *g_pAE;
 
 /* class AE */
     void AE :: LoadData(VirtualAddress address) {
-        Log("Loading virtual address " + to_string(address) + "data into AE");
+        Log("Loading virtual address " + to_string(address) + " data into AE");
         int i;
         Process * caller = g_pOS->GetCurrentTranslationTable().GetProcess();
         for (i = 0; i < DEFAULT_ARCHIVE_DISK_SPACE_SIZE; i++) {
@@ -255,10 +258,10 @@ extern AE *g_pAE;
             по записи.
         */
 
-        // int chance = randomizer(100);
-        // bool write_flag = chance > 80;
-        // Log("Chance for WriteFlag:" + to_string(chance));
-        // MemoryRequest(write_flag);
+        int chance = randomizer(100);
+        VirtualAddress virtual_address = (VirtualAddress)randomizer(DEFAULT_TRANSLATION_TABLE_SIZE);
+        bool write_flag = chance > 80;
+        Schedule(GetTime(), this, &Process::MemoryRequest,virtual_address,write_flag);
     };
     
     void Process :: Start() {

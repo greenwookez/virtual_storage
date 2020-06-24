@@ -28,9 +28,17 @@ std::string Agent::GetName()
 
 void Agent::Log(std::string text)
 {
+    /* bb */
+    std::string name_buffer = g_pSim->GetBuffer();
+    if (name_buffer != m_name)
+        std::cout << std::endl;
+    /* bb end */
+
     PrintTime(&std::cout);
     std::cout << " " << std::setw(10) << std::setfill(' ') << std::right << GetName()
         << "   " << text << std::endl;
+
+    g_pSim->SetBuffer(m_name); // bb
 }
 
 ////// EventQueue //////////////////////////////////////////////////////////////////////////

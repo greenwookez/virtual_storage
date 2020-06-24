@@ -72,9 +72,13 @@ public:
     SimulatorTime GetTime();
     bool Run();
 
+    void SetBuffer(std::string input) { buffer = input; }; // bb
+    std::string GetBuffer() { return buffer; }; // bb
+
 private:
     SimulatorTime m_Time;
     SimulatorTime m_Limit;
+    std::string buffer; // bb: буффер для имени последнего агента в логе
 };
 
 extern Sim *g_pSim;
