@@ -51,6 +51,7 @@ class TranslationTable {
     void AddRecord(TranslationTableRecord input);
     void EditRecord(RealAddress _real_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag ); // изменяет запись, зная реальный адрес
     TranslationTableRecord &GetRecord(VirtualAddress index) { return records[index]; };
+    TranslationTableRecord &GetRecordByRealAddress(RealAddress r_address);
 };
 
 struct MemoryRecord {
@@ -152,8 +153,9 @@ class AE : public Agent {
     int free_swap_index = 0;
 
     public:
-    void LoadData(VirtualAddress address);
+    void LoadData(VirtualAddress address, Process *caller);
     void PopData(VirtualAddress address);
+    int FindRecord(Process *caller, VirtualAddress address); // 0 if ok, -1 if not ok
 
     void Start();
     void Wait();

@@ -51,6 +51,14 @@ extern AE *g_pAE;
             }
         }
     };
+
+    TranslationTableRecord & TranslationTable :: GetRecordByRealAddress(RealAddress r_address) {
+        for (int i = 0; i < free_record; i++) {
+                if (records[i].real_address == r_address) {
+                    return records[i];
+                }
+        } 
+    };
 /* end of class TranslationTable */
 
 /* class CPU */
@@ -99,7 +107,7 @@ extern AE *g_pAE;
             Schedule(GetTime()+TIME_FOR_ALLOCATION, g_pOS, &OS::Allocate, i);
 
         Schedule(GetTime()+TIME_FOR_PROCESS_INITIALIZATION, _process, &Process::Work);
-        free_table_index++;
+        free_table_index++; 
         return;
     };
 
@@ -108,9 +116,15 @@ extern AE *g_pAE;
 
         // При обработке прерывания выполняем задачу размещения
         Schedule(GetTime()+TIME_FOR_ALLOCATION, g_pOS, &OS::Allocate, vaddress);
+
         
-        // И передадим управление обратно на процесс
         Process * caller = translation_tables[current_table_index]->GetProcess();
+        // Если по этому виртуальному адресу есть данные в АС, выгружаем их
+        if (g_pAE->FindRecord(caller, vaddress) == 0) {
+            Schedule(GetTime() + TIME_FOR_POP, g_pAE, &AE::PopData, vaddress);
+        };
+
+        // И передадим управление обратно на процесс     
         Schedule(GetTime(), caller, &Process::Wait);
     };
 
@@ -148,10 +162,14 @@ extern AE *g_pAE;
         tmp2.real_address = tmp;
         tmp2.is_valid = true;
         Log("Changing record with virtual address " + to_string(vaddress) + " in current translation table");
+
+        
         translation_tables[current_table_index]->GetRecord(vaddress) = tmp2;
 
         // Загрузим в АС содержимое реального адреса
-        Schedule(GetTime()+TIME_FOR_LOADING_DATA_IN_AE, g_pAE, &AE::LoadData, tmp);
+        Process * p_process = translation_tables[index]->GetProcess();
+        vaddress = translation_tables[index]->GetRecordByRealAddress(tmp).virtual_address;
+        Schedule(GetTime()+TIME_FOR_LOADING_DATA_IN_AE, g_pAE, &AE::LoadData, vaddress, p_process);
         return;
     };
 
@@ -203,10 +221,9 @@ extern AE *g_pAE;
 /* end of class OS */
 
 /* class AE */
-    void AE :: LoadData(VirtualAddress address) {
+    void AE :: LoadData(VirtualAddress address, Process *caller) {
         Log("Loading virtual address " + to_string(address) + " data into AE");
         int i;
-        Process * caller = g_pOS->GetCurrentTranslationTable().GetProcess();
         for (i = 0; i < DEFAULT_ARCHIVE_DISK_SPACE_SIZE; i++) {
             if (g_pComputer->GetDiskAddressSpace().GetPageByAddress(i).is_allocated == false) {
                 g_pComputer->GetDiskAddressSpace().GetPageByAddress(i).is_allocated = true;
@@ -233,7 +250,20 @@ extern AE *g_pAE;
                 break;
             };
         };
+
+        //Не учитывается в free_swap_index....
         return;
+    };
+
+
+    int AE :: FindRecord(Process *caller, VirtualAddress address) {
+        for (int i = 0; i < DEFAULT_ARCHIVE_ENVIROMENT_SIZE; i++) {
+            if (SwapIndex[i].p_process == caller && SwapIndex[i].virtual_address == address) {
+                return 0;
+            };
+        };
+
+        return -1;
     };
 
     void AE :: Start() {
