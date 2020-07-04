@@ -16,27 +16,31 @@ int main()
 {
     g_pSim = new Sim;
 
-    
-    
+    const int amount = 15;
+
     g_pOS = new OS;
     g_pOS->SetName("OS");
-    
+
     g_pCPU = new CPU;
     g_pCPU->SetName("CPU");
-    
+
     g_pAE = new AE;
     g_pAE->SetName("AE");
 
     g_pComputer = new Computer;
     g_pComputer->PrintCurrentConfig();
 
-    MyProcess *pProcess01 = new MyProcess;
-    pProcess01->SetName("Process01");
+    Process * all_processes[amount];
+    for (int i = 0; i < amount; i++) {
+        all_processes[i] = new Process;
+        string name = "Process" + to_string(i);
+        all_processes[i]->SetName(name);
+        Schedule(g_pSim->GetTime(), all_processes[i], &Process::Start);
+    };
 
-    pProcess01->Start();
 
-
-    g_pSim->SetLimit(30000);
+    SimulatorTime limit = 100*Sec;
+    g_pSim->SetLimit(limit);
     while(!g_pSim->Run())
     {
         PrintTime(&std::cout);
@@ -50,16 +54,17 @@ int main()
             break;
         };
 
-        g_pSim->SetLimit(g_pSim->GetTime()+30000);
+        g_pSim->SetLimit(g_pSim->GetTime()+limit);
     }
 
-    delete pProcess01;
+    for (int i = 0; i < amount; i++) {
+        delete all_processes[i];
+    };
 
     delete g_pSim;
     delete g_pComputer;
     delete g_pOS;
     delete g_pCPU;
     delete g_pAE;
-
     return 0;
 }

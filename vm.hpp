@@ -14,23 +14,21 @@ struct TranslationTableRecord { // Запись в таблице переадр
 };
 
 class Process : public Agent {
-    /* 
+    /*
         Класс - базовая модель процесса.
         Остальные модели будут являться наследниками этого класс
-     */ 
+     */
     uint64_t memory_usage = DEFAULT_MEMORY_USAGE; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
 
     public:
     void SetMemoryUsage(uint64_t value) { memory_usage = value; };
     uint64_t GetMemoryUsage() { return memory_usage; };
-    
+
     void MemoryRequest(VirtualAddress virtual_address, bool write_flag); // запрос памяти
     void Start(); // Стартует процесс загрузки себя в память (равносильно запуску исполняемого файла)
-    
+
     virtual void Work();
     void Wait();
-    
-    
 };
 
 class TranslationTable {
@@ -83,7 +81,7 @@ class Computer {
     uint64_t rm_size = DEFAULT_REAL_MEMORY_SIZE; // размер реальной памяти
     uint64_t ae_size = DEFAULT_ARCHIVE_ENVIROMENT_SIZE; // размер архивной среды
     uint64_t page_size = DEFAULT_PAGE_SIZE; // размер страницы в байтах в виде степени двойки
-    
+
     MemoryAddressSpace rm; // РАП
     DiskAddressSpace archive;
 
@@ -104,8 +102,8 @@ class CPU : public Agent {
         Класс, который моделирует работу процессора.
     */
     public:
-    void Convert(VirtualAddress address, bool write_flag); // Метод, решающий задачу преобразования виртуального адреса
-    
+    void Convert(VirtualAddress address, bool write_flag, Process *_process); // Метод, решающий задачу преобразования виртуального адреса
+
     void Wait();
     void Start();
 };
@@ -122,12 +120,13 @@ class OS : public Agent {
 
     public:
     void CallCPU(bool WriteFlag, int tt_index); // Вызов процессора для решения задачи преобразования виртуального адреса
-    void HandleInterruption(VirtualAddress vaddress); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
+    void HandleInterruption(VirtualAddress vaddress, Process * _process); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
     void IntitializeProcess(Process * _process); // Моделируется загрузка процесса в память
-    void Allocate(VirtualAddress vaddress); // размещение
+    void Allocate(VirtualAddress vaddress, Process * _process); // размещение
     void Substitute(VirtualAddress vaddress); // замещение
     void SetCurrentTable(Process *_process);
     int FindTableByValidAddress(RealAddress _address);
+    int FindTableByPointer(Process * _process);
     void Wait();
     void Start();
 
@@ -142,7 +141,7 @@ class AE : public Agent {
     /*
         Класс, который моделирует работу архивной среды.
     */
-   
+
     struct SwapIndexRecord {
         Process *p_process = nullptr;
         VirtualAddress virtual_address = -1;
@@ -167,4 +166,3 @@ class MyProcess : public Process {
     public:
     void Work();
 };
-

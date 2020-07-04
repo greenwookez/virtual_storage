@@ -137,7 +137,7 @@ SimulatorTime Sim::GetLimit()
     return m_Limit;
 }
 
-SimulatorTime Sim::GetTime()
+SimulatorTime & Sim::GetTime()
 {
     return m_Time;
 }
