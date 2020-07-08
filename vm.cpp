@@ -53,12 +53,13 @@ extern AE *g_pAE;
         }
     };
 
-    TranslationTableRecord & TranslationTable :: GetRecordByRealAddress(RealAddress r_address) {
-        for (int i = 0; i < free_record; i++) {
-                if (records[i].real_address == r_address) {
-                    return records[i];
-                }
-        }
+    TranslationTableRecord * TranslationTable :: GetRecordByRealAddress(RealAddress r_address) {
+        for (int i = 0; i < DEFAULT_TRANSLATION_TABLE_SIZE; i++) {
+            if (records[i].real_address == r_address) {
+                return &records[i];
+            };
+        };
+        return nullptr;
     };
 /* end of class TranslationTable */
 
@@ -74,7 +75,7 @@ extern AE *g_pAE;
             if (tmp.GetRecord(i).virtual_address == address && tmp.GetRecord(i).is_valid == true) {
                 Log("Successful conversion.");
                 Process * caller = g_pOS->GetCurrentTranslationTable().GetProcess();
-                Schedule(GetTime(), caller, &Process::Wait);
+                return;
             };
         };
 
@@ -98,16 +99,14 @@ extern AE *g_pAE;
 
         // При обработке прерывания выполняем задачу размещения
         Schedule(GetTime()+TIME_FOR_ALLOCATION, g_pOS, &OS::Allocate, vaddress, _process);
+        
+        
+        // Реализовать write_flag
 
-
-        Process * caller = translation_tables[current_table_index]->GetProcess();
         // Если по этому виртуальному адресу есть данные в АС, выгружаем их
-        if (g_pAE->FindRecord(caller, vaddress) == 0) {
+        if (g_pAE->FindRecord(_process, vaddress) == 0) {
             Schedule(GetTime() + TIME_FOR_POP, g_pAE, &AE::PopData, vaddress);
         };
-
-        // И передадим управление обратно на процесс
-        Schedule(GetTime(), caller, &Process::Wait);
     };
 
     void OS :: IntitializeProcess(Process *_process) {
@@ -124,15 +123,15 @@ extern AE *g_pAE;
         for (int i = 0; i < _process->GetMemoryUsage(); i++)
             Schedule(GetTime()+TIME_FOR_ALLOCATION, g_pOS, &OS::Allocate, i, _process);
 
-        Schedule(GetTime()+TIME_FOR_PROCESS_INITIALIZATION, _process, &Process::Work);
         free_table_index++;
+        Schedule(GetTime(), _process, &Process::Work);
         return;
     };
 
     void OS :: Allocate(VirtualAddress vaddress, Process * _process) {
 
         Log("Allocating virtual address " + to_string(vaddress));
-        printf("process address = %p\n", _process);
+        // printf("process address = %p\n", _process);
         // Process * caller = translation_tables[current_table_index]->GetProcess();
         for (int i = 0; i < g_pComputer->GetRealMemorySize(); i++) {
             if (g_pComputer->GetMemoryAddressSpace().GetPageByAddress(i).is_allocated == false) {
@@ -167,7 +166,7 @@ extern AE *g_pAE;
             tmp = (RealAddress)randomizer(g_pComputer->GetRealMemorySize());
             index = FindTableByValidAddress(tmp);
         };
-        cout << "table index = " << index << endl;
+        // cout << "table index = " << index << endl;
         Log("Redistributing real address " + to_string(tmp));
         translation_tables[index]->EditRecord(tmp, -1, -1, false); // -1 значит, что это значение изменяться не будет в структуре записи
         TranslationTableRecord tmp2;
@@ -176,7 +175,7 @@ extern AE *g_pAE;
         tmp2.is_valid = true;
         Log("Changing record with virtual address " + to_string(vaddress) + " in current translation table");
 
-        int current_index;
+        int current_index = -1;
         while (1) {
             current_index = FindTableByPointer(_process);
             if (current_index != -1) {
@@ -187,7 +186,7 @@ extern AE *g_pAE;
         translation_tables[current_index]->GetRecord(vaddress) = tmp2;
 
         // Загрузим в АС содержимое реального адреса
-        vaddress = translation_tables[index]->GetRecordByRealAddress(tmp).virtual_address;
+        vaddress = translation_tables[index]->GetRecordByRealAddress(tmp)->virtual_address;
         Schedule(GetTime()+TIME_FOR_LOADING_DATA_IN_AE, g_pAE, &AE::LoadData, vaddress, _process);
         return;
     };
@@ -315,16 +314,21 @@ extern AE *g_pAE;
             80 процентов обращений к памяти происходят по чтению, и только 20 -
             по записи.
         */
-
+        Log("I'm working. Remain work " + to_string(call_number) + " times.");
         int chance = randomizer(100);
         VirtualAddress virtual_address = (VirtualAddress)randomizer(DEFAULT_TRANSLATION_TABLE_SIZE);
         bool write_flag = chance > 80;
         Schedule(GetTime(), this, &Process::MemoryRequest,virtual_address,write_flag);
+
+        if (call_number > 0) {
+            Schedule(GetTime() + 10, this, &Process::Work);
+            call_number = call_number-1;
+        }
     };
 
     void Process :: Start() {
         Log("Starting...");
-        Schedule(GetTime()+100, g_pOS, &OS::IntitializeProcess, this);
+        Schedule(GetTime()+TIME_FOR_PROCESS_INITIALIZATION, g_pOS, &OS::IntitializeProcess, this);
     };
 
     void Process :: Wait() {

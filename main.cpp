@@ -39,7 +39,7 @@ int main()
     };
 
 
-    SimulatorTime limit = 100*Sec;
+    SimulatorTime limit = 72*Hour;
     g_pSim->SetLimit(limit);
     while(!g_pSim->Run())
     {

@@ -19,10 +19,11 @@ class Process : public Agent {
         Остальные модели будут являться наследниками этого класс
      */
     uint64_t memory_usage = DEFAULT_MEMORY_USAGE; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
-
+    uint64_t call_number = CPU_TIME*OPERATIONS_PER_SECOND;
     public:
     void SetMemoryUsage(uint64_t value) { memory_usage = value; };
     uint64_t GetMemoryUsage() { return memory_usage; };
+    void SetCallNumber(uint64_t value) { call_number = value; };
 
     void MemoryRequest(VirtualAddress virtual_address, bool write_flag); // запрос памяти
     void Start(); // Стартует процесс загрузки себя в память (равносильно запуску исполняемого файла)
@@ -49,7 +50,7 @@ class TranslationTable {
     void AddRecord(TranslationTableRecord input);
     void EditRecord(RealAddress _real_address, VirtualAddress input_vaddress, RealAddress input_raddress, bool valid_flag ); // изменяет запись, зная реальный адрес
     TranslationTableRecord &GetRecord(VirtualAddress index) { return records[index]; };
-    TranslationTableRecord &GetRecordByRealAddress(RealAddress r_address);
+    TranslationTableRecord *GetRecordByRealAddress(RealAddress r_address);
 };
 
 struct MemoryRecord {
