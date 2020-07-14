@@ -20,10 +20,18 @@ extern AE *g_pAE;
         srand(unsigned(clock()));
         return rand()%max;
     };
+
+    void AgentVM :: Log(string text) {
+        string tail = " | RML=" + to_string((float)g_pComputer->CountRM() /  (float)DEFAULT_REAL_MEMORY_SIZE * 100).substr(0,5)
+        + " AEL=" + to_string((float)g_pComputer->CountAE() /  (float)DEFAULT_ARCHIVE_ENVIROMENT_SIZE * 100).substr(0,5)
+        + " PSL=" + to_string(g_pComputer->GetTimeCount() /1000000) + " TOTAL=" + to_string(g_pSim->GetTime()/ 1000000);
+        Agent::Log(text + tail);
+    };
 /* end of help functions */
 
 /* class TranslationTable */
     TranslationTable :: TranslationTable()  {
+        free_record = 0;
         for (int i = 0; i < DEFAULT_TRANSLATION_TABLE_SIZE; i++) {
             records[i].virtual_address = i;
             records[i].real_address = -1;
@@ -73,17 +81,17 @@ extern AE *g_pAE;
 
         for (int i = 0; i < DEFAULT_TRANSLATION_TABLE_SIZE; i++) {
             if (tmp.GetRecord(i).virtual_address == address && tmp.GetRecord(i).is_valid == true) {
-                Log("Successful conversion.");
-                Process * caller = g_pOS->GetCurrentTranslationTable().GetProcess();
+                //Log("Translate VA=" + string(4-to_string(address).length(), '0') + to_string(address) + " " + _process->GetName() + " -> RA=" + string(4-to_string(i).length(), '0') + to_string(i));
                 return;
             };
         };
+        //Log("Translate VA=" + string(4-to_string(address).length(), '0') + to_string(address) + " " + _process->GetName() + " -> Interrupt");
 
         Schedule(GetTime(), g_pOS, &OS::HandleInterruption, address, _process);
     };
 
     void CPU :: Wait() {
-        Log("I am waiting!");
+        //Log("I am waiting!");
         //TODO: Добавить реализацию.
     };
 
@@ -95,11 +103,10 @@ extern AE *g_pAE;
 /* class OS */
 
     void OS :: HandleInterruption(VirtualAddress vaddress, Process * _process) {
-        Log("Got an Interruption.");
+        //Log("Got an Interruption.");
 
         // При обработке прерывания выполняем задачу размещения
         Schedule(GetTime()+TIME_FOR_ALLOCATION, g_pOS, &OS::Allocate, vaddress, _process);
-        
         
         // Реализовать write_flag
 
@@ -113,24 +120,22 @@ extern AE *g_pAE;
         /*
             В этом методе моделируются действия по загрузке кода процесса в память.
         */
-        Log("Initializing " + _process->GetName());
+        //Log("Initializing " + _process->GetName());
         // Создаём новую ТП для этого процесса
         translation_tables[free_table_index] = new TranslationTable;
         translation_tables[free_table_index]->SetProcess(_process);
         g_pOS->SetCurrentTable(_process);
 
         // Заполняем нужное количетво записей в ТП
-        for (int i = 0; i < _process->GetMemoryUsage(); i++)
+        for (int i = 0; i < _process->GetMemoryUsage(); i++) {
             Schedule(GetTime()+TIME_FOR_ALLOCATION, g_pOS, &OS::Allocate, i, _process);
-
+        }
         free_table_index++;
         Schedule(GetTime(), _process, &Process::Work);
         return;
     };
 
     void OS :: Allocate(VirtualAddress vaddress, Process * _process) {
-
-        Log("Allocating virtual address " + to_string(vaddress));
         // printf("process address = %p\n", _process);
         // Process * caller = translation_tables[current_table_index]->GetProcess();
         for (int i = 0; i < g_pComputer->GetRealMemorySize(); i++) {
@@ -152,13 +157,13 @@ extern AE *g_pAE;
                 };
 
                 translation_tables[index]->GetRecord(vaddress) = tmp;
-                Log("I have found out free real address " + to_string(i));
+                Log("  Allocate RA=" + string(4 - to_string(i).length(), '0') + to_string(i) + " as VA=" + string(4 - to_string(vaddress).length(), '0') + to_string(vaddress) + " " + _process->GetName() + ", resume");
                 return;
             };
         };
 
         // Если свободного реального адреса нет в РАП, то решаем задачу замещения
-        Log("No free real addresses. Starting the redestribution");
+        
         int index = -1;
         RealAddress tmp;
         while (index == -1) { // В цикле найдём нужную ТП
@@ -166,14 +171,13 @@ extern AE *g_pAE;
             tmp = (RealAddress)randomizer(g_pComputer->GetRealMemorySize());
             index = FindTableByValidAddress(tmp);
         };
+        Log("  Deallocate RA=" + string(4-to_string(tmp).length(), '0') + to_string(tmp) + " " + _process->GetName());
         // cout << "table index = " << index << endl;
-        Log("Redistributing real address " + to_string(tmp));
         translation_tables[index]->EditRecord(tmp, -1, -1, false); // -1 значит, что это значение изменяться не будет в структуре записи
         TranslationTableRecord tmp2;
         tmp2.virtual_address = vaddress;
         tmp2.real_address = tmp;
         tmp2.is_valid = true;
-        Log("Changing record with virtual address " + to_string(vaddress) + " in current translation table");
 
         int current_index = -1;
         while (1) {
@@ -187,7 +191,7 @@ extern AE *g_pAE;
 
         // Загрузим в АС содержимое реального адреса
         vaddress = translation_tables[index]->GetRecordByRealAddress(tmp)->virtual_address;
-        Schedule(GetTime()+TIME_FOR_LOADING_DATA_IN_AE, g_pAE, &AE::LoadData, vaddress, _process);
+        Schedule(GetTime()+TIME_FOR_LOADING_DATA_IN_AE, g_pAE, &AE::LoadData, vaddress, _process, tmp);
         return;
     };
 
@@ -249,8 +253,7 @@ extern AE *g_pAE;
 /* end of class OS */
 
 /* class AE */
-    void AE :: LoadData(VirtualAddress address, Process *caller) {
-        Log("Loading virtual address " + to_string(address) + " data into AE");
+    void AE :: LoadData(VirtualAddress address, Process *caller, RealAddress raddress) {
         int i;
         for (i = 0; i < DEFAULT_ARCHIVE_DISK_SPACE_SIZE; i++) {
             if (g_pComputer->GetDiskAddressSpace().GetPageByAddress(i).is_allocated == false) {
@@ -262,8 +265,10 @@ extern AE *g_pAE;
         tmp.p_process = caller;
         tmp.virtual_address = address;
         tmp.disk_address = i;
+        Log("    Save RA=" + string(4-to_string(raddress).length() , '0') + to_string(raddress) + " (" + caller->GetName() + " VA=" + string(4-to_string(address).length() , '0') + to_string(address) + ") -> AA=" + string(4-to_string(i).length() , '0') + to_string(i));
 
         SwapIndex[free_swap_index] = tmp;
+        g_pComputer->AddTimeCount(TIME_FOR_ALLOCATION);
         free_swap_index++;
         return;
     };
@@ -278,7 +283,7 @@ extern AE *g_pAE;
                 break;
             };
         };
-
+        g_pComputer->AddTimeCount(TIME_FOR_POP);
         //Не учитывается в free_swap_index....
         return;
     };
@@ -299,7 +304,6 @@ extern AE *g_pAE;
     }
 
     void AE :: Wait() {
-        Log("I am waiting");
     };
 /* end of class AE*/
 
@@ -314,7 +318,6 @@ extern AE *g_pAE;
             80 процентов обращений к памяти происходят по чтению, и только 20 -
             по записи.
         */
-        Log("I'm working. Remain work " + to_string(call_number) + " times.");
         int chance = randomizer(100);
         VirtualAddress virtual_address = (VirtualAddress)randomizer(DEFAULT_TRANSLATION_TABLE_SIZE);
         bool write_flag = chance > 80;
@@ -327,12 +330,11 @@ extern AE *g_pAE;
     };
 
     void Process :: Start() {
-        Log("Starting...");
         Schedule(GetTime()+TIME_FOR_PROCESS_INITIALIZATION, g_pOS, &OS::IntitializeProcess, this);
     };
 
     void Process :: Wait() {
-        Log("I am waiting.");
+        //Log("I am waiting.");
         //TODO: Добавить реализацию.
     };
 /* end of class Process */
@@ -379,5 +381,25 @@ extern AE *g_pAE;
 
         cout << setw(10) << setfill(' ') << left <<  "Page Size"
         << setw(5) << right << " = " << "2^" <<to_string(page_size) << endl;
+    };
+
+    uint64_t Computer :: CountRM() {
+        uint64_t result = 0;
+        for(int i = 0; i < DEFAULT_REAL_MEMORY_SIZE; i++) {
+            if(rm.GetPageByAddress(i).is_allocated == true) {
+                result++;
+            }
+        };
+        return result;
+    };
+
+    uint64_t Computer :: CountAE() {
+        uint64_t result = 0;
+        for(int i = 0; i < DEFAULT_ARCHIVE_ENVIROMENT_SIZE; i++) {
+            if(rm.GetPageByAddress(i).is_allocated == true) {
+                result++;
+            }
+        };
+        return result;
     };
 /* end of class Computer */

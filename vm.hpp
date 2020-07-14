@@ -8,19 +8,35 @@ typedef PageNumber RealAddress;
 typedef PageNumber DiskAddress;
 
 struct TranslationTableRecord { // Запись в таблице переадресации
+    public:
+    TranslationTableRecord() {
+        real_address = -1;
+        is_valid = false;
+    }
     VirtualAddress virtual_address; // Адрес из ВАП
-    RealAddress real_address = -1; // Адрес из РАП (при наличии)
-    bool is_valid = false; // бит действительности
+    RealAddress real_address; // Адрес из РАП (при наличии)
+    bool is_valid; // бит действительности
 };
 
-class Process : public Agent {
+
+class AgentVM : public Agent {
+    public:
+    void Log(string text); // Переопределение логирования для вывода загруженности системы в конце каждого сообщения
+};
+
+class Process : public AgentVM {
     /*
         Класс - базовая модель процесса.
         Остальные модели будут являться наследниками этого класс
      */
-    uint64_t memory_usage = DEFAULT_MEMORY_USAGE; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
-    uint64_t call_number = CPU_TIME*OPERATIONS_PER_SECOND;
+    uint64_t memory_usage; // количество страниц в памяти, необходимое для размещения этого процесса в памяти
+    uint64_t call_number;
     public:
+    Process() {
+        memory_usage = DEFAULT_MEMORY_USAGE;
+        call_number = CPU_TIME*OPERATIONS_PER_SECOND;
+    };
+
     void SetMemoryUsage(uint64_t value) { memory_usage = value; };
     uint64_t GetMemoryUsage() { return memory_usage; };
     void SetCallNumber(uint64_t value) { call_number = value; };
@@ -36,7 +52,7 @@ class TranslationTable {
     Process *p_process;
     TranslationTableRecord records[DEFAULT_TRANSLATION_TABLE_SIZE]; // массив записей
     int index; // индекс ТП
-    int free_record = 0; // индекс текущей первой свободной записи в массиве records
+    int free_record; // индекс текущей первой свободной записи в массиве records
 
     public:
     TranslationTable();
@@ -53,8 +69,13 @@ class TranslationTable {
     TranslationTableRecord *GetRecordByRealAddress(RealAddress r_address);
 };
 
-struct MemoryRecord {
-    bool is_allocated = 0; // флаг распределения, по умолчанию все страницы НЕ распределены
+class MemoryRecord {
+    public:
+    bool is_allocated; // флаг распределения, по умолчанию все страницы НЕ распределены
+
+    MemoryRecord() {
+        is_allocated = 0;
+    };
     // здесь можно добавить какие-либо ещё данные
 };
 
@@ -78,15 +99,23 @@ class Computer {
         Здесь также будут высчитываться загруженность системы
         и накладные расходы на страничный обмен.
     */
-    // TODO: Убрать рудименты ниже
-    uint64_t rm_size = DEFAULT_REAL_MEMORY_SIZE; // размер реальной памяти
-    uint64_t ae_size = DEFAULT_ARCHIVE_ENVIROMENT_SIZE; // размер архивной среды
-    uint64_t page_size = DEFAULT_PAGE_SIZE; // размер страницы в байтах в виде степени двойки
+    uint64_t rm_size; // размер реальной памяти
+    uint64_t ae_size; // размер архивной среды
+    uint64_t page_size; // размер страницы в байтах в виде степени двойки
+
+    uint64_t time_count; // счетчик времени, затраченного на страничный обмен
 
     MemoryAddressSpace rm; // РАП
     DiskAddressSpace archive;
 
     public:
+    Computer() {
+        time_count = 0;
+        rm_size = DEFAULT_REAL_MEMORY_SIZE;
+        ae_size = DEFAULT_ARCHIVE_ENVIROMENT_SIZE;
+        page_size = DEFAULT_PAGE_SIZE;
+    };
+
     void SetRealMemorySize(uint64_t value) { rm_size = value; };
     void SetArchiveEnviromentSize(uint64_t value) { ae_size = value; };
     void SetPageSize(uint64_t value) { page_size = value; };
@@ -96,30 +125,43 @@ class Computer {
     uint64_t GetArchiveEnviromentSize() { return ae_size; };
     uint64_t GetPageSize() { return page_size; };
     void PrintCurrentConfig();
+
+    void AddTimeCount(uint64_t value) { time_count += value; };
+    uint64_t GetTimeCount() { return time_count; };
+
+    uint64_t CountRM(); // считает количество распределенных ячеек памяти
+    uint64_t CountAE(); // 
 };
 
-class CPU : public Agent {
+class CPU : public AgentVM {
     /*
         Класс, который моделирует работу процессора.
     */
     public:
+    CPU() { SetName("CPU"); };
     void Convert(VirtualAddress address, bool write_flag, Process *_process); // Метод, решающий задачу преобразования виртуального адреса
 
     void Wait();
     void Start();
 };
 
-class OS : public Agent {
+class OS : public AgentVM {
     /*
         Класс, который моделирует работу ОС, а также решает задачи
         управления ВП, в том числе обеспечивает ТП.
     */
 
     TranslationTable *translation_tables[MAX_PROCESS_NUM];
-    int free_table_index = 0;
-    int current_table_index = 0;
+    int free_table_index;
+    int current_table_index;
 
     public:
+    OS() {
+        SetName("OS");
+        free_table_index = 0;
+        current_table_index = 0;
+    };
+
     void CallCPU(bool WriteFlag, int tt_index); // Вызов процессора для решения задачи преобразования виртуального адреса
     void HandleInterruption(VirtualAddress vaddress, Process * _process); // Обработка прерывания по отсутствию страницы для дальнейшего делегирования классу AE
     void IntitializeProcess(Process * _process); // Моделируется загрузка процесса в память
@@ -138,22 +180,33 @@ class OS : public Agent {
 extern OS *g_pOS;
 extern CPU *g_pCPU;
 
-class AE : public Agent {
+class AE : public AgentVM {
     /*
         Класс, который моделирует работу архивной среды.
     */
 
-    struct SwapIndexRecord {
-        Process *p_process = nullptr;
-        VirtualAddress virtual_address = -1;
+    class SwapIndexRecord {
+        public:
+        Process *p_process;
+        VirtualAddress virtual_address;
         DiskAddress disk_address;
+
+        
+        SwapIndexRecord() {
+            p_process = nullptr;
+            virtual_address = -1;
+        };
     };
 
     SwapIndexRecord SwapIndex[DEFAULT_ARCHIVE_ENVIROMENT_SIZE];
-    int free_swap_index = 0;
+    int free_swap_index;
 
     public:
-    void LoadData(VirtualAddress address, Process *caller);
+    AE() {
+        SetName("AE");
+        free_swap_index = 0;
+    };
+    void LoadData(VirtualAddress vaddress, Process *caller, RealAddress raddress);
     void PopData(VirtualAddress address);
     int FindRecord(Process *caller, VirtualAddress address); // 0 if ok, -1 if not ok
 

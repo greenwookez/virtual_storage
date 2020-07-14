@@ -19,13 +19,8 @@ int main()
     const int amount = 15;
 
     g_pOS = new OS;
-    g_pOS->SetName("OS");
-
     g_pCPU = new CPU;
-    g_pCPU->SetName("CPU");
-
     g_pAE = new AE;
-    g_pAE->SetName("AE");
 
     g_pComputer = new Computer;
     g_pComputer->PrintCurrentConfig();
@@ -33,7 +28,7 @@ int main()
     Process * all_processes[amount];
     for (int i = 0; i < amount; i++) {
         all_processes[i] = new Process;
-        string name = "Process" + to_string(i);
+        string name = "Process" + string(2-to_string(i).length(), '0') + to_string(i);
         all_processes[i]->SetName(name);
         Schedule(g_pSim->GetTime(), all_processes[i], &Process::Start);
     };

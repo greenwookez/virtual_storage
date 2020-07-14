@@ -20,7 +20,7 @@ public:
     SimulatorTime GetTime();
     void SetName(std::string str);
     std::string GetName();
-    void Log(std::string text);
+    virtual void Log(std::string text);
 
 private:
     std::string m_name;
